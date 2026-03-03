@@ -7,7 +7,7 @@ import numpy as np
 import subprocess
 
 if len(sys.argv) < 3:
-    print("Usage: python3 experiment_grand_unification.py <book.txt> <output.jsonl>")
+    print("Usage: python3 semantic_map_reduce.py <book.txt> <output.jsonl>")
     sys.exit(1)
 
 BOOK_FILE = sys.argv[1]

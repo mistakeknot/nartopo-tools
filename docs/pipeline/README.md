@@ -11,4 +11,4 @@ Please proceed through the steps sequentially:
 4. [Verification and Deployment](04-deployment.md)
 
 ---
-*For optimizing context usage on massive texts, see [Pipeline Efficiency & Grand Unification](05-efficiency.md).*
+*For optimizing context usage on massive texts, see [Pipeline Efficiency & Semantic Map-Reduce](05-efficiency.md).*
