@@ -10,7 +10,7 @@ import os
 # 2. Nebula Award Best Novel Winners (Wikipedia)
 # 3. Locus Award for Best Science Fiction Novel (Wikipedia)
 # 4. NPR Top 100 Sci-Fi/Fantasy (Hardcoded knowledge)
-# 5. Goodreads Top Sci-Fi (Hardcoded knowledge)
+# 5. Locus All-Time Best SF Novel Poll (Hardcoded knowledge)
 
 books = []
 
@@ -77,9 +77,10 @@ for table in tables:
                 if year_text.isdigit():
                     books.append((author, novel))
 
-print("Adding NPR Top Sci-Fi & Goodreads Popular lists...")
+print("Adding NPR Top Sci-Fi & Locus All-Time Best SF Novel Poll lists...")
 
-npr_goodreads_data = [
+npr_locus_data = [
+    # NPR Top 100 Sci-Fi/Fantasy
     ("J.R.R. Tolkien", "The Lord of the Rings"),
     ("Douglas Adams", "The Hitchhiker's Guide to the Galaxy"),
     ("Orson Scott Card", "Ender's Game"),
@@ -92,101 +93,81 @@ npr_goodreads_data = [
     ("Neil Gaiman", "American Gods"),
     ("William Goldman", "The Princess Bride"),
     ("Robert Jordan", "The Wheel of Time"),
-    ("Animal Farm", "George Orwell"),
-    ("Neuromancer", "William Gibson"),
-    ("Watchmen", "Alan Moore"),
-    ("I, Robot", "Isaac Asimov"),
-    ("Stranger in a Strange Land", "Robert A. Heinlein"),
-    ("The Kingkiller Chronicle", "Robert Jordan"),
-    ("Slaughterhouse-Five", "Kurt Vonnegut"),
-    ("Frankenstein", "Mary Shelley"),
-    ("Do Androids Dream of Electric Sheep?", "Philip K. Dick"),
-    ("The Handmaid's Tale", "Margaret Atwood"),
-    ("The Dark Tower", "Patrick Rothfuss"),
-    ("1984", "George Orwell"),
-    ("The Stand", "Stephen King"),
-    ("Snow Crash", "William Gibson"),
-    ("The Martian Chronicles", "Ray Bradbury"),
-    ("Cat's Cradle", "Kurt Vonnegut"),
-    ("The Sandman", "Neil Gaiman"),
-    ("A Clockwork Orange", "Anthony Burgess"),
-    ("Starship Troopers", "Robert A. Heinlein"),
-    ("Watership Down", "Kurt Vonnegut"),
-    ("The Dragonriders of Pern", "Richard Adams"),
-    ("The Left Hand of Darkness", "Ursula K. Le Guin"),
-    ("The Moon is a Harsh Mistress", "Robert A. Heinlein"),
-    ("Ringworld", "Larry Niven"),
-    ("The Mists of Avalon", "Richard Adams"),
-    ("The Once and Future King", "T.H. White"),
-    ("Childhood's End", "Arthur C. Clarke"),
-    ("Contact", "Carl Sagan"),
-    ("The Foundation Trilogy", "Isaac Asimov"),
-    ("The Dispossessed", "Ursula K. Le Guin"),
-    ("The Martian", "Andy Weir"),
-    ("Ready Player One", "Neal Stephenson"),
-    ("The Three-Body Problem", "Cixin Liu"),
-    ("Hyperion", "Larry Niven"),
-    ("Old Man's War", "John Scalzi"),
-    ("The Expanse", "James S.A. Corey"),
-    ("Red Rising", "Pierce Brown"),
-    ("Leviathan Wakes", "James S.A. Corey"),
-    ("Altered Carbon", "Pierce Brown"),
-    ("Snow Crash", "Neal Stephenson"),
-    ("Ancillary Justice", "Ann Leckie"),
-    ("A Memory Called Empire", "Ann Leckie"),
-    ("The Fifth Season", "N.K. Jemisin"),
-    ("Binti", "Ann Leckie"),
-    ("The Hunger Games", "Suzanne Collins"),
-    ("The Road", "Stephen King"),
-    ("Children of Time", "Nnedi Okorafor"),
-    ("All Systems Red", "Martha Wells"),
-    ("This Is How You Lose the Time War", "Amal El-Mohtar"),
-    ("Gideon the Ninth", "Tamsyn Muir"),
-    ("Project Hail Mary", "Andy Weir"),
-    ("A Fire Upon the Deep", "Vernor Vinge"),
-    ("The Diamond Age", "Neal Stephenson"),
-    ("A Canticle for Leibowitz", "Walter M. Miller Jr."),
-    ("The Lathe of Heaven", "Ursula K. Le Guin"),
-    ("Solaris", "Stanislaw Lem"),
-    ("The City & The City", "China Miéville"),
-    ("Perdido Street Station", "China Miéville"),
-    ("The Time Machine", "H.G. Wells"),
-    ("The War of the Worlds", "H.G. Wells"),
-    ("Rendezvous with Rama", "Arthur C. Clarke"),
-    ("The Stars My Destination", "Arthur C. Clarke"),
-    ("The Demolished Man", "Alfred Bester"),
-    ("The Forever War", "John Scalzi"),
-    ("Ubik", "Philip K. Dick"),
-    ("The Man in the High Castle", "Philip K. Dick"),
-    ("The Sirens of Titan", "Kurt Vonnegut"),
-    ("The Day of the Triffids", "John Wyndham"),
-    ("The Chrysalids", "John Wyndham"),
-    ("Oryx and Crake", "Margaret Atwood"),
-    ("The Windup Girl", "Paolo Bacigalupi"),
-    ("The Water Knife", "Paolo Bacigalupi"),
-    ("The Drowned World", "J.G. Ballard"),
-    ("The Time Traveler's Wife", "Audrey Niffenegger"),
-    ("The Sparrow", "Mary Doria Russell"),
-    ("Doomsday Book", "Connie Willis"),
-    ("To Say Nothing of the Dog", "Connie Willis"),
-    ("The Years of Rice and Salt", "Kim Stanley Robinson"),
-    ("Red Mars", "Kim Stanley Robinson"),
-    ("The Player of Games", "Iain M. Banks"),
-    ("Use of Weapons", "Iain M. Banks"),
-    ("Consider Phlebas", "Iain M. Banks"),
-    ("Excession", "Iain M. Banks"),
-    ("Revelation Space", "Alastair Reynolds"),
-    ("Chasm City", "Alastair Reynolds"),
-    ("Pandora's Star", "Peter F. Hamilton"),
-    ("The Reality Dysfunction", "Peter F. Hamilton")
+    ("George Orwell", "Animal Farm"),
+    ("William Gibson", "Neuromancer"),
+    ("Alan Moore", "Watchmen"),
+    ("Isaac Asimov", "I, Robot"),
+    ("Robert A. Heinlein", "Stranger in a Strange Land"),
+    ("Patrick Rothfuss", "The Kingkiller Chronicle"),
+    ("Kurt Vonnegut", "Slaughterhouse-Five"),
+    ("Mary Shelley", "Frankenstein"),
+    ("Philip K. Dick", "Do Androids Dream of Electric Sheep?"),
+    ("Margaret Atwood", "The Handmaid's Tale"),
+    ("Stephen King", "The Dark Tower"),
+    ("Stephen King", "The Stand"),
+    ("Neal Stephenson", "Snow Crash"),
+    ("Ray Bradbury", "The Martian Chronicles"),
+    ("Kurt Vonnegut", "Cat's Cradle"),
+    ("Neil Gaiman", "The Sandman"),
+    ("Anthony Burgess", "A Clockwork Orange"),
+    ("Robert A. Heinlein", "Starship Troopers"),
+    ("Kurt Vonnegut", "Watership Down"),
+    ("Richard Adams", "The Dragonriders of Pern"),
+    ("Ursula K. Le Guin", "The Left Hand of Darkness"),
+    ("Robert A. Heinlein", "The Moon is a Harsh Mistress"),
+    ("Larry Niven", "Ringworld"),
+    ("Marion Zimmer Bradley", "The Mists of Avalon"),
+    ("T.H. White", "The Once and Future King"),
+    ("Arthur C. Clarke", "Childhood's End"),
+    ("Carl Sagan", "Contact"),
+    ("Ursula K. Le Guin", "The Dispossessed"),
+    
+    # Locus All-Time Best SF Novel Poll
+    ("Frank Herbert", "Dune"),
+    ("Ursula K. Le Guin", "The Left Hand of Darkness"),
+    ("Orson Scott Card", "Ender's Game"),
+    ("Isaac Asimov", "The Foundation Trilogy"),
+    ("Alfred Bester", "The Stars My Destination"),
+    ("Robert A. Heinlein", "The Moon is a Harsh Mistress"),
+    ("Joe Haldeman", "The Forever War"),
+    ("William Gibson", "Neuromancer"),
+    ("Arthur C. Clarke", "Childhood's End"),
+    ("Larry Niven", "Ringworld"),
+    ("Ursula K. Le Guin", "The Dispossessed"),
+    ("Arthur C. Clarke", "Rendezvous with Rama"),
+    ("Robert A. Heinlein", "Starship Troopers"),
+    ("Neal Stephenson", "Snow Crash"),
+    ("Walter M. Miller Jr.", "A Canticle for Leibowitz"),
+    ("George Orwell", "1984"),
+    ("Robert A. Heinlein", "Stranger in a Strange Land"),
+    ("H.G. Wells", "The Time Machine"),
+    ("Ray Bradbury", "The Martian Chronicles"),
+    ("Philip K. Dick", "Do Androids Dream of Electric Sheep?"),
+    ("H.G. Wells", "The War of the Worlds"),
+    ("Isaac Asimov", "I, Robot"),
+    ("Stanislaw Lem", "Solaris"),
+    ("Philip K. Dick", "Ubik"),
+    ("Alfred Bester", "The Demolished Man"),
+    ("Kurt Vonnegut", "The Sirens of Titan"),
+    ("Frederik Pohl", "Gateway"),
+    ("Larry Niven and Jerry Pournelle", "The Mote in God's Eye"),
+    ("John Brunner", "Stand on Zanzibar"),
+    ("Arthur C. Clarke", "The City and the Stars"),
+    ("Gene Wolfe", "The Book of the New Sun"),
+    ("Roger Zelazny", "Lord of Light"),
+    ("Vernor Vinge", "A Fire Upon the Deep"),
+    ("Orson Scott Card", "Speaker for the Dead"),
+    ("Neal Stephenson", "The Diamond Age"),
+    ("Dan Simmons", "Hyperion"),
+    ("Kim Stanley Robinson", "Red Mars"),
+    ("Isaac Asimov", "The Gods Themselves"),
+    ("Greg Bear", "A Fire Upon the Deep"),
+    ("Iain M. Banks", "The Player of Games"),
+    ("Iain M. Banks", "Use of Weapons")
 ]
 
-for item in npr_goodreads_data:
-    # Some items might be (title, author) instead of (author, title) based on the manual list
-    if item[0].lower() in ["animal farm", "neuromancer", "watchmen", "i, robot", "stranger in a strange land", "the kingkiller chronicle", "slaughterhouse-five", "frankenstein", "do androids dream of electric sheep?", "the handmaid's tale", "the dark tower", "1984", "the stand", "snow crash", "the martian chronicles", "cat's cradle", "the sandman", "a clockwork orange", "starship troopers", "watership down", "the dragonriders of pern", "the left hand of darkness", "the moon is a harsh mistress", "ringworld", "the mists of avalon", "the once and future king", "childhood's end", "contact", "the foundation trilogy", "the dispossessed", "the martian", "ready player one", "the three-body problem", "hyperion", "old man's war", "the expanse", "red rising", "leviathan wakes", "altered carbon", "ancillary justice", "a memory called empire", "the fifth season", "binti", "the hunger games", "the road", "children of time", "all systems red", "this is how you lose the time war", "gideon the ninth", "project hail mary", "a fire upon the deep", "the diamond age", "a canticle for leibowitz", "the lathe of heaven", "solaris", "the city & the city", "perdido street station", "the time machine", "the war of the worlds", "rendezvous with rama", "the stars my destination", "the demolished man", "the forever war", "ubik", "the man in the high castle", "the sirens of titan", "the day of the triffids", "the chrysalids", "oryx and crake", "the windup girl", "the water knife", "the drowned world", "the time traveler's wife", "the sparrow", "doomsday book", "to say nothing of the dog", "the years of rice and salt", "red mars", "the player of games", "use of weapons", "consider phlebas", "excession", "revelation space", "chasm city", "pandora's star", "the reality dysfunction"]:
-        books.append((item[1], item[0]))
-    else:
-        books.append((item[0], item[1]))
+for author, title in npr_locus_data:
+    books.append((author, title))
 
 # Clean and normalize
 def normalize_string(s):
@@ -204,6 +185,7 @@ for author, title in books:
     if "william gibson" in norm_author: norm_author = "william gibson"
     if "arthur c clarke" in norm_author: norm_author = "arthur c clarke"
     if "philip k dick" in norm_author: norm_author = "philip k dick"
+    if "heinlein" in norm_author: norm_author = "robert a heinlein"
     
     normalized_books.append((norm_author, norm_title, author, title))
 
@@ -243,6 +225,6 @@ with open(out_path, 'w') as f:
 
 print(f"Saved top 100 missing books to {out_path}")
 
-print("\n--- TOP 10 HIGH-PRIORITY TARGETS (Best of + Awards) ---")
+print("\n--- TOP 10 HIGH-PRIORITY TARGETS (Awards + Locus/NPR) ---")
 for i, book in enumerate(ranked_todo[:10]):
     print(f"{i+1}. {book['title']} by {book['author']} (Appeared on {book['list_appearances']} lists)")

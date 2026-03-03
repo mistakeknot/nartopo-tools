@@ -2,16 +2,46 @@
   {
     "author": "Frank Herbert",
     "title": "Dune",
-    "list_appearances": 3
+    "list_appearances": 4
   },
   {
     "author": "Ursula K. Le Guin",
     "title": "The Left Hand of Darkness",
-    "list_appearances": 3
+    "list_appearances": 4
   },
   {
     "author": "Larry Niven",
     "title": "Ringworld",
+    "list_appearances": 4
+  },
+  {
+    "author": "Orson Scott Card",
+    "title": "Ender's Game",
+    "list_appearances": 4
+  },
+  {
+    "author": "Orson Scott Card",
+    "title": "Speaker for the Dead",
+    "list_appearances": 4
+  },
+  {
+    "author": "Robert A. Heinlein",
+    "title": "Starship Troopers",
+    "list_appearances": 3
+  },
+  {
+    "author": "Robert A. Heinlein",
+    "title": "Stranger in a Strange Land",
+    "list_appearances": 3
+  },
+  {
+    "author": "Robert A. Heinlein",
+    "title": "The Moon Is a Harsh Mistress",
+    "list_appearances": 3
+  },
+  {
+    "author": "Isaac Asimov",
+    "title": "The Gods Themselves",
     "list_appearances": 3
   },
   {
@@ -20,28 +50,28 @@
     "list_appearances": 3
   },
   {
+    "author": "Joe Haldeman",
+    "title": "The Forever War",
+    "list_appearances": 3
+  },
+  {
+    "author": "Frederik Pohl",
+    "title": "Gateway",
+    "list_appearances": 3
+  },
+  {
     "author": "David Brin",
     "title": "Startide Rising",
     "list_appearances": 3
   },
   {
-    "author": "Orson Scott Card",
-    "title": "Ender's Game",
-    "list_appearances": 3
-  },
-  {
-    "author": "Orson Scott Card",
-    "title": "Speaker for the Dead",
+    "author": "Dan Simmons",
+    "title": "Hyperion",
     "list_appearances": 3
   },
   {
     "author": "Neal Stephenson",
     "title": "The Diamond Age",
-    "list_appearances": 3
-  },
-  {
-    "author": "Connie Willis",
-    "title": "To Say Nothing of the Dog",
     "list_appearances": 3
   },
   {
@@ -55,18 +85,8 @@
     "list_appearances": 3
   },
   {
-    "author": "Paolo Bacigalupi",
-    "title": "The Windup Girl",
-    "list_appearances": 3
-  },
-  {
     "author": "Connie Willis",
     "title": "Blackout/All Clear",
-    "list_appearances": 3
-  },
-  {
-    "author": "Ann Leckie",
-    "title": "Ancillary Justice",
     "list_appearances": 3
   },
   {
@@ -80,18 +100,8 @@
     "list_appearances": 3
   },
   {
-    "author": "Connie Willis",
-    "title": "Doomsday Book",
-    "list_appearances": 3
-  },
-  {
     "author": "Alfred Bester",
     "title": "The Demolished Man",
-    "list_appearances": 2
-  },
-  {
-    "author": "Robert A. Heinlein",
-    "title": "Starship Troopers",
     "list_appearances": 2
   },
   {
@@ -100,33 +110,13 @@
     "list_appearances": 2
   },
   {
-    "author": "Robert A. Heinlein",
-    "title": "Stranger in a Strange Land",
+    "author": "Roger Zelazny",
+    "title": "Lord of Light",
     "list_appearances": 2
   },
   {
-    "author": "Philip K. Dick",
-    "title": "The Man in the High Castle",
-    "list_appearances": 2
-  },
-  {
-    "author": "Robert A. Heinlein",
-    "title": "The Moon Is a Harsh Mistress",
-    "list_appearances": 2
-  },
-  {
-    "author": "Isaac Asimov",
-    "title": "The Gods Themselves",
-    "list_appearances": 2
-  },
-  {
-    "author": "Joe Haldeman",
-    "title": "The Forever War",
-    "list_appearances": 2
-  },
-  {
-    "author": "Frederik Pohl",
-    "title": "Gateway",
+    "author": "John Brunner",
+    "title": "Stand on Zanzibar",
     "list_appearances": 2
   },
   {
@@ -160,11 +150,6 @@
     "list_appearances": 2
   },
   {
-    "author": "Dan Simmons",
-    "title": "Hyperion",
-    "list_appearances": 2
-  },
-  {
     "author": "Lois McMaster Bujold",
     "title": "Barrayar",
     "list_appearances": 2
@@ -195,6 +180,11 @@
     "list_appearances": 2
   },
   {
+    "author": "Connie Willis",
+    "title": "To Say Nothing of the Dog",
+    "list_appearances": 2
+  },
+  {
     "author": "Lois McMaster Bujold",
     "title": "Paladin of Souls",
     "list_appearances": 2
@@ -202,6 +192,11 @@
   {
     "author": "Vernor Vinge",
     "title": "Rainbows End",
+    "list_appearances": 2
+  },
+  {
+    "author": "Paolo Bacigalupi",
+    "title": "The Windup Girl",
     "list_appearances": 2
   },
   {
@@ -215,6 +210,11 @@
     "list_appearances": 2
   },
   {
+    "author": "Ann Leckie",
+    "title": "Ancillary Justice",
+    "list_appearances": 2
+  },
+  {
     "author": "N. K. Jemisin",
     "title": "The Stone Sky",
     "list_appearances": 2
@@ -225,13 +225,13 @@
     "list_appearances": 2
   },
   {
-    "author": "Kim Stanley Robinson",
-    "title": "Red Mars",
+    "author": "Connie Willis",
+    "title": "Doomsday Book",
     "list_appearances": 2
   },
   {
     "author": "Kim Stanley Robinson",
-    "title": "The Years of Rice and Salt",
+    "title": "Red Mars",
     "list_appearances": 2
   },
   {
@@ -242,6 +242,31 @@
   {
     "author": "Isaac Asimov",
     "title": "The Foundation Trilogy",
+    "list_appearances": 2
+  },
+  {
+    "author": "Isaac Asimov",
+    "title": "I, Robot",
+    "list_appearances": 2
+  },
+  {
+    "author": "Philip K. Dick",
+    "title": "Do Androids Dream of Electric Sheep?",
+    "list_appearances": 2
+  },
+  {
+    "author": "Neal Stephenson",
+    "title": "Snow Crash",
+    "list_appearances": 2
+  },
+  {
+    "author": "Ray Bradbury",
+    "title": "The Martian Chronicles",
+    "list_appearances": 2
+  },
+  {
+    "author": "Arthur C. Clarke",
+    "title": "Childhood's End",
     "list_appearances": 2
   },
   {
@@ -265,6 +290,11 @@
     "list_appearances": 1
   },
   {
+    "author": "Philip K. Dick",
+    "title": "The Man in the High Castle",
+    "list_appearances": 1
+  },
+  {
     "author": "Clifford D. Simak",
     "title": "Here Gather the Stars(also known asWay Station)",
     "list_appearances": 1
@@ -272,16 +302,6 @@
   {
     "author": "Fritz Leiber",
     "title": "The Wanderer",
-    "list_appearances": 1
-  },
-  {
-    "author": "Roger Zelazny",
-    "title": "Lord of Light",
-    "list_appearances": 1
-  },
-  {
-    "author": "John Brunner",
-    "title": "Stand on Zanzibar",
     "list_appearances": 1
   },
   {
@@ -477,26 +497,6 @@
   {
     "author": "Greg Bear",
     "title": "Moving Mars",
-    "list_appearances": 1
-  },
-  {
-    "author": "Robert J. Sawyer",
-    "title": "The Terminal Experiment",
-    "list_appearances": 1
-  },
-  {
-    "author": "Nicola Griffith",
-    "title": "Slow River",
-    "list_appearances": 1
-  },
-  {
-    "author": "Vonda N. McIntyre",
-    "title": "The Moon and the Sun",
-    "list_appearances": 1
-  },
-  {
-    "author": "Octavia E. Butler",
-    "title": "Parable of the Talents",
     "list_appearances": 1
   }
 ]
