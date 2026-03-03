@@ -1,6 +1,6 @@
 # nartopo-tools
 
-Ingestion pipeline for the [Nartopo](https://nartopo.com) narrative topology engine. Downloads books, extracts text, and writes structured analyses via an MCP server.
+Ingestion pipeline for the [Nartopo](https://nartopo.com) narrative topology engine. Downloads books, extracts text, and writes validated structural analyses.
 
 ## Setup
 
@@ -33,13 +33,13 @@ npm run ingest -- --author "Author Name" --title "Book Title" --year 2020
 
 This searches Anna's Archive, downloads the EPUB, extracts text, and scaffolds an analysis template in `../data/`.
 
-### MCP server for writing analyses
+### Write a validated analysis
 
 ```bash
-npm run mcp
+echo '{ "title": "...", "author": "...", ... }' | npm run add-analysis
 ```
 
-Starts a stdio MCP server with an `add_analysis` tool that validates and writes structured analysis files to `../data/`.
+Validates the JSON against the Nartopo schema (Zod), templates YAML frontmatter + Markdown, writes to `../data/`, and verifies the output parses correctly.
 
 ## See Also
 

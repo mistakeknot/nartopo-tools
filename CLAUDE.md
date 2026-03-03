@@ -4,9 +4,9 @@ Ingestion pipeline for Nartopo — downloads books, extracts text, writes struct
 
 ## Quick Reference
 
-- **What:** CLI tools and MCP server for adding new works to the Nartopo database
+- **What:** CLI tools for adding new works to the Nartopo database
 - **Location:** Lives inside `Nartopo/` as a gitignored subdirectory (separate git repo)
-- **Scripts:** `npm run ingest` (download + extract), `npm run mcp` (MCP server)
+- **Scripts:** `npm run ingest` (download + extract), `npm run add-analysis` (validated analysis writing via stdin JSON)
 - **Data target:** Writes to `../data/` (the parent Nartopo repo's data directory)
 - **Books:** Downloads to `../../books/` (sibling of Nartopo at `~/projects/books/`)
 - **Env:** `../../books/.env` must have `ANNAS_ARCHIVE_API_KEY`

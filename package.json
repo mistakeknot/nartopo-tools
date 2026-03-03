@@ -5,10 +5,9 @@
   "description": "Ingestion pipeline for the Nartopo narrative topology engine",
   "scripts": {
     "ingest": "tsx scripts/ingest.ts",
-    "mcp": "tsx scripts/mcp-server.ts"
+    "add-analysis": "tsx scripts/add-analysis.ts"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1",
     "@types/adm-zip": "^0.5.7",
     "@types/html-to-text": "^9.0.4",
     "@types/yargs": "^17.0.35",

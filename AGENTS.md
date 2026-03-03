@@ -16,7 +16,7 @@ Nartopo/                    # Parent repo (Next.js app + data)
 └── nartopo-tools/          # This repo (gitignored by parent)
     ├── scripts/
     │   ├── ingest.ts       # CLI: download + extract + scaffold
-    │   └── mcp-server.ts   # MCP server: validated analysis writing
+    │   └── add-analysis.ts  # CLI: validated analysis writing (stdin JSON)
     └── package.json
 
 ~/projects/books/           # Downloaded EPUBs/text (separate, untracked)
@@ -29,7 +29,7 @@ Nartopo/                    # Parent repo (Next.js app + data)
 ## The Ingestion Pipeline
 
 ### Core Rules
-1. **Never write files to `../data/` manually.** Always use the Nartopo MCP server (`add_analysis`) to prevent schema drift and YAML/Markdown formatting errors.
+1. **Never write files to `../data/` manually.** Always use the `add-analysis` CLI to prevent schema drift and YAML/Markdown formatting errors.
 2. **Do NOT commit raw text.** All EPUBs and extracted `.txt` files must stay in `../../books/`.
 3. **Run build after adding.** Always run `npm run build` in the parent Nartopo repo to verify the generated Next.js application parses the new work correctly.
 
@@ -55,20 +55,15 @@ If a book text is too large to fit effectively into a single context window or y
 
 See [docs/pipeline/](docs/pipeline/) for instructions on using the `map_reduce.sh` script to chunk the text and synthesize parallel structural findings.
 
-### Step 3: Writing the Analysis via Nartopo MCP
+### Step 3: Writing the Analysis via CLI
 
-The AI agent MUST NOT write to `../data/` directly. Instead, use the local Nartopo MCP server:
+The AI agent MUST NOT write to `../data/` directly. Instead, pipe the analysis JSON through the `add-analysis` CLI:
 
-1. **Check Tools:**
-   ```bash
-   mcp tools npm run mcp
-   ```
-2. **Submit Analysis:**
-   ```bash
-   mcp call add_analysis --params '{ "title": "...", "author": "...", ... }' npm run mcp
-   ```
+```bash
+echo '{ "title": "...", "author": "...", ... }' | npm run add-analysis
+```
 
-The MCP server strictly validates the schema using Zod, templates the Markdown headers, and writes the file to `../data/`.
+The CLI validates the schema using Zod, calculates the file slug, templates the YAML frontmatter and Markdown headers, writes the file, and validates it can be parsed back. On success it prints the relative path (`data/{slug}.md`).
 
 ### Step 4: Verification and Deployment
 
@@ -84,7 +79,7 @@ If `npm run ingest` fails because the `annas-archive-mcp` returns a network erro
 echo 'ANNAS_ARCHIVE_DOMAIN=annas-archive.gl' >> ../../books/.env
 ```
 
-The patched MCP client reads this environment variable and routes requests through the unblocked mirror.
+The ingest script reads this environment variable and routes requests through the unblocked mirror.
 
 ## Legal and Ethical Scope
 
