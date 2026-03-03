@@ -355,11 +355,11 @@ author: "${data.author.replace(/"/g, '\\"')}"
 year: ${data.year}
 frameworks_mapped: ["Protocol Fiction Mapping", "Actantial Model", "Todorov's Equilibrium", "The Freytag Pyramid", "Propp's Morphology", "Genette’s Narrative", "The Monomyth", "Dan Harmon", "Save the Cat", "Kishōtenketsu", "The Three-Act Structure"]
 todorov_stages:
-  equilibrium: "${data.todorov_stages.equilibrium.replace(/"/g, '"')}"
-  disruption: "${data.todorov_stages.disruption.replace(/"/g, '"')}"
-  recognition: "${data.todorov_stages.recognition.replace(/"/g, '"')}"
-  repair: "${data.todorov_stages.repair.replace(/"/g, '"')}"
-  new_equilibrium: "${data.todorov_stages.new_equilibrium.replace(/"/g, '"')}"
+  equilibrium: "${data.todorov_stages.equilibrium.replace(/"/g, '\\"')}"
+  disruption: "${data.todorov_stages.disruption.replace(/"/g, '\\"')}"
+  recognition: "${data.todorov_stages.recognition.replace(/"/g, '\\"')}"
+  repair: "${data.todorov_stages.repair.replace(/"/g, '\\"')}"
+  new_equilibrium: "${data.todorov_stages.new_equilibrium.replace(/"/g, '\\"')}"
 quadrant_scores:
   time_linearity: ${data.quadrant_scores.time_linearity}
   pacing_velocity: ${data.quadrant_scores.pacing_velocity}
@@ -410,8 +410,8 @@ ${data.grand_unification_scores ? `grand_unification_scores:
   conflict_style: ${data.grand_unification_scores.conflict_style}
   price_type: ${data.grand_unification_scores.price_type}` : ""}
 medium: "${data.medium}"
-genre_tags: [${data.genre_tags.map((t) => `"${t.replace(/"/g, '"')}"`).join(", ")}]
-tropes: [${data.tropes.map((t) => `"${t.replace(/"/g, '"')}"`).join(", ")}]
+genre_tags: [${data.genre_tags.map((t) => `"${t.replace(/"/g, '\\"')}"`).join(", ")}]
+tropes: [${data.tropes.map((t) => `"${t.replace(/"/g, '\\"')}"`).join(", ")}]
 analysis_metadata:
   generated_by: "mcp-agent"
   date: "${new Date().toISOString().split("T")[0]}"

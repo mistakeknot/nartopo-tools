@@ -172,8 +172,8 @@ async function main() {
     .replace(/\s+/g, "_")
     .replace(/[^\w_]/g, "");
   const slug = `${slugAuthor}_${slugTitle}`;
-  const templatePath = path.resolve(__dirname, "../data/_template.md");
-  const targetPath = path.resolve(__dirname, `../data/${slug}.md`);
+  const templatePath = path.resolve(__dirname, "../../data/_template.md");
+  const targetPath = path.resolve(__dirname, `../../data/${slug}.md`);
 
   if (fs.existsSync(targetPath)) {
     console.warn(`⚠️  Template already exists at data/${slug}.md. Skipping generation.`);
