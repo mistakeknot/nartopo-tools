@@ -415,7 +415,7 @@ tropes: [${data.tropes.map((t) => `"${t.replace(/"/g, '\\"')}"`).join(", ")}]
 analysis_metadata:
   generated_by: "mcp-agent"
   date: "${new Date().toISOString().split("T")[0]}"
-  validation_status: "approved"
+  validation_status: "pending"
 ---`;
 
     // Serialize Markdown Body
@@ -488,11 +488,34 @@ ${
 
     fs.writeFileSync(filePath, yaml + "\n" + markdown.trim(), "utf-8");
 
+    // Validate the written file can be parsed back
+    const written = fs.readFileSync(filePath, "utf-8");
+    const fmMatch = written.match(/^---\n([\s\S]*?)\n---/);
+    if (!fmMatch) {
+      fs.unlinkSync(filePath);
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Validation failed: written file has no valid YAML frontmatter. File deleted.` }],
+      };
+    }
+
+    // Check essential fields are present in the raw YAML
+    const rawYaml = fmMatch[1];
+    const requiredKeys = ["title", "author", "year", "quadrant_scores", "frameworks_mapped", "medium", "genre_tags"];
+    const missingKeys = requiredKeys.filter((k) => !rawYaml.includes(`${k}:`));
+    if (missingKeys.length > 0) {
+      fs.unlinkSync(filePath);
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Validation failed: missing keys [${missingKeys.join(", ")}]. File deleted.` }],
+      };
+    }
+
     return {
       content: [
         {
           type: "text",
-          text: `Analysis successfully written to data/${slug}.md`,
+          text: `Analysis written and validated: data/${slug}.md`,
         },
       ],
     };

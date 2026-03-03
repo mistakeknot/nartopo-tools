@@ -134,7 +134,33 @@ async function main() {
     const zipEntries = zip.getEntries();
     let fullText = "";
 
-    // Basic heuristic: read HTML/XHTML files
+    // Parse OPF manifest spine for correct reading order
+    let spineOrder: string[] = [];
+    const opfEntry = zipEntries.find(
+      (e) => e.entryName.endsWith(".opf")
+    );
+    if (opfEntry) {
+      const opfXml = zip.readAsText(opfEntry);
+      const opfDir = path.dirname(opfEntry.entryName);
+
+      // Extract manifest items: id → href
+      const manifestItems = new Map<string, string>();
+      const itemRe = /<item\s[^>]*?id="([^"]+)"[^>]*?href="([^"]+)"[^>]*?\/?>/g;
+      let m;
+      while ((m = itemRe.exec(opfXml)) !== null) {
+        const href = opfDir !== "." ? `${opfDir}/${m[2]}` : m[2];
+        manifestItems.set(m[1], href);
+      }
+
+      // Extract spine order
+      const spineRe = /<itemref\s[^>]*?idref="([^"]+)"[^>]*?\/?>/g;
+      while ((m = spineRe.exec(opfXml)) !== null) {
+        const href = manifestItems.get(m[1]);
+        if (href) spineOrder.push(href);
+      }
+    }
+
+    // Filter to HTML/XHTML entries
     const htmlEntries = zipEntries.filter(
       (entry) =>
         entry.name.endsWith(".html") ||
@@ -142,8 +168,20 @@ async function main() {
         entry.name.endsWith(".htm")
     );
 
-    // Sort by name or entry path to maintain relative chapter order
-    htmlEntries.sort((a, b) => a.entryName.localeCompare(b.entryName));
+    // Sort by OPF spine order if available, otherwise natural sort
+    if (spineOrder.length > 0) {
+      const orderMap = new Map(spineOrder.map((href, i) => [href, i]));
+      htmlEntries.sort((a, b) => {
+        const ai = orderMap.get(a.entryName) ?? 9999;
+        const bi = orderMap.get(b.entryName) ?? 9999;
+        return ai - bi;
+      });
+    } else {
+      // Natural sort: chapter_2 before chapter_10
+      htmlEntries.sort((a, b) =>
+        a.entryName.localeCompare(b.entryName, undefined, { numeric: true })
+      );
+    }
 
     for (const entry of htmlEntries) {
       const htmlContent = zip.readAsText(entry);
