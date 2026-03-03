@@ -9,3 +9,6 @@ Please proceed through the steps sequentially:
    * *(Optional)* [Map-Reduce Pipeline for Massive Texts](02b-map-reduce.md)
 3. [Writing the Analysis via Nartopo MCP](03-mcp-injection.md)
 4. [Verification and Deployment](04-deployment.md)
+
+---
+*For historical context on why we use these specific ingestion methods over semantic RAG or compression tools, see [Experiments & Efficiency](05-experiments-and-efficiency.md).*
