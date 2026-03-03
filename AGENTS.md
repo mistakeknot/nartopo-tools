@@ -53,7 +53,7 @@ The AI agent must read the extracted text file located at `../../books/{Author N
 
 If a book text is too large to fit effectively into a single context window or you need to ensure rigorous, highly-localized structural extraction across a massive epic, you can orchestrate multiple Gemini sub-agents. 
 
-See [docs/pipeline.md](docs/pipeline.md) for instructions on using the `map_reduce.sh` script to chunk the text and synthesize parallel structural findings.
+See [docs/pipeline/](docs/pipeline/) for instructions on using the `map_reduce.sh` script to chunk the text and synthesize parallel structural findings.
 
 ### Step 3: Writing the Analysis via Nartopo MCP
 
