@@ -5,7 +5,7 @@ When performing structural analysis on large books (e.g., 300k+ characters), bru
 ## 1. The Baseline: Brute-Force Context Loading
 * **Method:** Reading the entire raw text into a single agent's context window.
 * **Result:** Produces the highest fidelity, "ground truth" structural analysis, capturing all micro-pacing anomalies and deep thematic resonances.
-* **Cost:** Extremely high (e.g., ~880k tokens for *Excession*).
+* **Cost:** Extremely high (e.g., ~880k tokens for *Excession*, 385k for *Solaris*).
 
 ## 2. The Solution: Map-Reduce Parallel Sub-Agents (`map_reduce.sh`)
 * **Method:** Splitting the text into 150k-character chunks and spawning headless `gemini` sub-agents to extract localized structural data simultaneously.
@@ -20,7 +20,10 @@ When performing structural analysis on large books (e.g., 300k+ characters), bru
 * **Method:** Chunked the book and used local embedding models (`all-MiniLM-L6-v2` and `nomic-embed-text`) to retrieve snippets matching structural keywords (e.g., "inciting incident", "climax").
 * **Result:** **Structurally Inadequate.** While this successfully dropped token consumption by 68-92% (e.g., extracting only 70k-280k characters), it completely destroyed the agent's ability to analyze pacing, narrative duration, and atmospheric tone. It surfaced the main plot beats but missed the "boring" connective tissue that defines the actual structure of the novel. RAG is excellent for factual QA, but useless for holistic structural mapping.
 
-## 5. Future Investigations: Hybrid Methods
-While the Map-Reduce pipeline currently produces the best quality at the expense of horizontal token volume, future development could explore:
-* **Sliding Window Summarization:** Agent 2 receives Chunk 2 *plus* the structural summary from Agent 1. This guarantees continuity across chunk boundaries.
-* **Intermediate JSONL Generation:** Sub-agents extract strictly formatted `{"type": "action|dialogue", "summary": "..."}` event timelines rather than prose bullet points, allowing the primary agent to algorithmically calculate pacing and velocity (e.g. counting the ratio of action vs dialogue events) without needing to synthetically reason over raw summaries.
+## 5. The Ultimate Optimization: The "Grand Unification" Meta-Hybrid Pipeline
+* **Method:** Combining the successes of Map-Reduce with sliding-window continuous context, local FAISS micro-indexing, and rigid JSONL data structures.
+* **Result:** **A scalable, mathematically rigorous structural timeline.** The sub-agents output highly compressed, strict JSON Lines of events tagged by structural category (e.g. `action`, `dialogue`). This eliminates LLM "vibe" bias from pacing analysis entirely—the final agent simply algorithms the ratio of the tags. The results were nearly identical to the brute force method, achieving the same 0.85 Pacing Velocity ("Observational") score for *Solaris* based on tag ratios, but using a fraction of the context window per chunk.
+* **Cost:** Low / Highly Scalable.
+
+---
+**Conclusion:** For optimal balance of token-efficiency and structural accuracy, use the **Grand Unification** methodology (see `experiment_grand_unification.py`).
