@@ -1,0 +1,9 @@
+[project]
+name = "nartopo-tools"
+version = "0.1.0"
+description = "Analysis tools for the Nartopo pipeline"
+requires-python = ">=3.10"
+dependencies = [
+    "faiss-cpu",
+    "numpy",
+]

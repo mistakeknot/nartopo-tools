@@ -16,7 +16,7 @@ This is a Meta-Hybrid approach combining:
 
 **Usage:**
 ```bash
-python3 scripts/semantic_map_reduce.py "../../books/{Author Name}/{Book Title}.txt" "/tmp/{Book Title}_timeline.jsonl"
+uv run scripts/semantic_map_reduce.py "../../books/{Author Name}/{Book Title}.txt" "/tmp/{Book Title}_timeline.jsonl"
 ```
 
 *This method guarantees >40% token savings on massive epics while perfectly matching brute-force accuracy.*
