@@ -265,9 +265,9 @@ for (norm_author, norm_title), count in counter.most_common():
 
 out_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../docs/research/prioritized_backlog.json'))
 with open(out_path, 'w') as f:
-    json.dump(ranked_todo[:100], f, indent=2)
+    json.dump(ranked_todo, f, indent=2)
 
-print(f"Saved top 100 missing books to {out_path}")
+print(f"Saved {len(ranked_todo)} missing books to {out_path}")
 
 print("\n--- TOP 10 HIGH-PRIORITY TARGETS (Awards + Locus/NPR) ---")
 for i, book in enumerate(ranked_todo[:10]):
