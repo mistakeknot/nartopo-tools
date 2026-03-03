@@ -49,6 +49,56 @@ const AddAnalysisSchema = z.object({
     })
     .optional()
     .describe("Optional memory-based scores for A/B testing"),
+  minilm_rag_scores: z
+    .object({
+      time_linearity: z.number().min(0).max(1),
+      pacing_velocity: z.number().min(0).max(1),
+      threat_scale: z.number().min(0).max(1),
+      protagonist_fate: z.number().min(0).max(1),
+      conflict_style: z.number().min(0).max(1),
+      price_type: z.number().min(0).max(1),
+    })
+    .optional(),
+  nomic_rag_scores: z
+    .object({
+      time_linearity: z.number().min(0).max(1),
+      pacing_velocity: z.number().min(0).max(1),
+      threat_scale: z.number().min(0).max(1),
+      protagonist_fate: z.number().min(0).max(1),
+      conflict_style: z.number().min(0).max(1),
+      price_type: z.number().min(0).max(1),
+    })
+    .optional(),
+  hybrid_index_scores: z
+    .object({
+      time_linearity: z.number().min(0).max(1),
+      pacing_velocity: z.number().min(0).max(1),
+      threat_scale: z.number().min(0).max(1),
+      protagonist_fate: z.number().min(0).max(1),
+      conflict_style: z.number().min(0).max(1),
+      price_type: z.number().min(0).max(1),
+    })
+    .optional(),
+  sliding_window_scores: z
+    .object({
+      time_linearity: z.number().min(0).max(1),
+      pacing_velocity: z.number().min(0).max(1),
+      threat_scale: z.number().min(0).max(1),
+      protagonist_fate: z.number().min(0).max(1),
+      conflict_style: z.number().min(0).max(1),
+      price_type: z.number().min(0).max(1),
+    })
+    .optional(),
+  grand_unification_scores: z
+    .object({
+      time_linearity: z.number().min(0).max(1),
+      pacing_velocity: z.number().min(0).max(1),
+      threat_scale: z.number().min(0).max(1),
+      protagonist_fate: z.number().min(0).max(1),
+      conflict_style: z.number().min(0).max(1),
+      price_type: z.number().min(0).max(1),
+    })
+    .optional(),
   medium: z.string().default("book").describe("Medium of the work"),
   genre_tags: z.array(z.string()).describe("Array of genre tags"),
   tropes: z.array(z.string()).describe("Array of tropes"),
@@ -123,13 +173,13 @@ function zodToJsonSchema(schema: z.ZodType<any, any, any>) {
   // simplified implementation for standard types
   return {
     type: "object",
-    properties: {
+    properties: { minilm_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, nomic_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, hybrid_index_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, sliding_window_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, grand_unification_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } },
       title: { type: "string", description: "Title of the book" },
       author: { type: "string", description: "Author of the book" },
       year: { type: "number", description: "Year of publication" },
       quadrant_scores: {
         type: "object",
-        properties: {
+        properties: { minilm_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, nomic_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, hybrid_index_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, sliding_window_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, grand_unification_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } },
           time_linearity: { type: "number", minimum: 0, maximum: 1 },
           pacing_velocity: { type: "number", minimum: 0, maximum: 1 },
           threat_scale: { type: "number", minimum: 0, maximum: 1 },
@@ -148,7 +198,7 @@ function zodToJsonSchema(schema: z.ZodType<any, any, any>) {
       },
       llm_memory_quadrant_scores: {
         type: "object",
-        properties: {
+        properties: { minilm_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, nomic_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, hybrid_index_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, sliding_window_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, grand_unification_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } },
           time_linearity: { type: "number", minimum: 0, maximum: 1 },
           pacing_velocity: { type: "number", minimum: 0, maximum: 1 },
           threat_scale: { type: "number", minimum: 0, maximum: 1 },
@@ -162,7 +212,7 @@ function zodToJsonSchema(schema: z.ZodType<any, any, any>) {
       tropes: { type: "array", items: { type: "string" } },
       todorov_stages: {
         type: "object",
-        properties: {
+        properties: { minilm_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, nomic_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, hybrid_index_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, sliding_window_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, grand_unification_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } },
           equilibrium: { type: "string" },
           disruption: { type: "string" },
           recognition: { type: "string" },
@@ -179,10 +229,10 @@ function zodToJsonSchema(schema: z.ZodType<any, any, any>) {
       },
       frameworks: {
         type: "object",
-        properties: {
+        properties: { minilm_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, nomic_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, hybrid_index_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, sliding_window_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, grand_unification_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } },
           protocol_fiction_mapping: {
             type: "object",
-            properties: {
+            properties: { minilm_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, nomic_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, hybrid_index_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, sliding_window_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, grand_unification_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } },
               rule: { type: "string" },
               failure_mode: { type: "string" },
               human_insight: { type: "string" },
@@ -191,7 +241,7 @@ function zodToJsonSchema(schema: z.ZodType<any, any, any>) {
           },
           actantial_model: {
             type: "object",
-            properties: {
+            properties: { minilm_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, nomic_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, hybrid_index_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, sliding_window_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, grand_unification_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } },
               subject: { type: "string" },
               object: { type: "string" },
               sender: { type: "string" },
@@ -210,7 +260,7 @@ function zodToJsonSchema(schema: z.ZodType<any, any, any>) {
           },
           freytag_pyramid: {
             type: "object",
-            properties: {
+            properties: { minilm_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, nomic_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, hybrid_index_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, sliding_window_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, grand_unification_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } },
               exposition: { type: "string" },
               climax: { type: "string" },
             },
@@ -219,7 +269,7 @@ function zodToJsonSchema(schema: z.ZodType<any, any, any>) {
           propps_morphology: { type: "string" },
           genettes_narrative: {
             type: "object",
-            properties: {
+            properties: { minilm_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, nomic_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, hybrid_index_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, sliding_window_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, grand_unification_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } },
               order: { type: "string" },
               duration: { type: "string" },
               focalization: { type: "string" },
@@ -231,7 +281,7 @@ function zodToJsonSchema(schema: z.ZodType<any, any, any>) {
           save_the_cat: { type: "string" },
           kishotenketsu: {
             type: "object",
-            properties: {
+            properties: { minilm_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, nomic_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, hybrid_index_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, sliding_window_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, grand_unification_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } },
               applicability: { type: "string" },
               ki: { type: "string" },
               sho: { type: "string" },
@@ -242,7 +292,7 @@ function zodToJsonSchema(schema: z.ZodType<any, any, any>) {
           },
           three_act_structure: {
             type: "object",
-            properties: { plot_points: { type: "string" } },
+            properties: { minilm_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, nomic_rag_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, hybrid_index_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, sliding_window_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, grand_unification_scores: { type: "object", properties: { time_linearity: { type: "number", minimum: 0, maximum: 1 }, pacing_velocity: { type: "number", minimum: 0, maximum: 1 }, threat_scale: { type: "number", minimum: 0, maximum: 1 }, protagonist_fate: { type: "number", minimum: 0, maximum: 1 }, conflict_style: { type: "number", minimum: 0, maximum: 1 }, price_type: { type: "number", minimum: 0, maximum: 1 } } }, plot_points: { type: "string" } },
             required: ["plot_points"],
           },
         },
@@ -295,12 +345,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       .replace(/[^\w_]/g, "");
     const slug = `${slugAuthor}_${slugTitle}`;
 
-    const filePath = path.resolve(__dirname, `../data/${slug}.md`);
+    // Resolve to the parent Nartopo root directory, assuming this script is in nartopo-tools/scripts/
+    const filePath = path.resolve(__dirname, `../../data/${slug}.md`);
 
     // Serialize YAML
     const yaml = `---
-title: "${data.title.replace(/"/g, '"')}"
-author: "${data.author.replace(/"/g, '"')}"
+title: "${data.title.replace(/"/g, '\\"')}"
+author: "${data.author.replace(/"/g, '\\"')}"
 year: ${data.year}
 frameworks_mapped: ["Protocol Fiction Mapping", "Actantial Model", "Todorov's Equilibrium", "The Freytag Pyramid", "Propp's Morphology", "Genette’s Narrative", "The Monomyth", "Dan Harmon", "Save the Cat", "Kishōtenketsu", "The Three-Act Structure"]
 todorov_stages:
@@ -323,6 +374,41 @@ ${data.llm_memory_quadrant_scores ? `llm_memory_quadrant_scores:
   protagonist_fate: ${data.llm_memory_quadrant_scores.protagonist_fate}
   conflict_style: ${data.llm_memory_quadrant_scores.conflict_style}
   price_type: ${data.llm_memory_quadrant_scores.price_type}` : ""}
+${data.minilm_rag_scores ? `minilm_rag_scores:
+  time_linearity: ${data.minilm_rag_scores.time_linearity}
+  pacing_velocity: ${data.minilm_rag_scores.pacing_velocity}
+  threat_scale: ${data.minilm_rag_scores.threat_scale}
+  protagonist_fate: ${data.minilm_rag_scores.protagonist_fate}
+  conflict_style: ${data.minilm_rag_scores.conflict_style}
+  price_type: ${data.minilm_rag_scores.price_type}` : ""}
+${data.nomic_rag_scores ? `nomic_rag_scores:
+  time_linearity: ${data.nomic_rag_scores.time_linearity}
+  pacing_velocity: ${data.nomic_rag_scores.pacing_velocity}
+  threat_scale: ${data.nomic_rag_scores.threat_scale}
+  protagonist_fate: ${data.nomic_rag_scores.protagonist_fate}
+  conflict_style: ${data.nomic_rag_scores.conflict_style}
+  price_type: ${data.nomic_rag_scores.price_type}` : ""}
+${data.hybrid_index_scores ? `hybrid_index_scores:
+  time_linearity: ${data.hybrid_index_scores.time_linearity}
+  pacing_velocity: ${data.hybrid_index_scores.pacing_velocity}
+  threat_scale: ${data.hybrid_index_scores.threat_scale}
+  protagonist_fate: ${data.hybrid_index_scores.protagonist_fate}
+  conflict_style: ${data.hybrid_index_scores.conflict_style}
+  price_type: ${data.hybrid_index_scores.price_type}` : ""}
+${data.sliding_window_scores ? `sliding_window_scores:
+  time_linearity: ${data.sliding_window_scores.time_linearity}
+  pacing_velocity: ${data.sliding_window_scores.pacing_velocity}
+  threat_scale: ${data.sliding_window_scores.threat_scale}
+  protagonist_fate: ${data.sliding_window_scores.protagonist_fate}
+  conflict_style: ${data.sliding_window_scores.conflict_style}
+  price_type: ${data.sliding_window_scores.price_type}` : ""}
+${data.grand_unification_scores ? `grand_unification_scores:
+  time_linearity: ${data.grand_unification_scores.time_linearity}
+  pacing_velocity: ${data.grand_unification_scores.pacing_velocity}
+  threat_scale: ${data.grand_unification_scores.threat_scale}
+  protagonist_fate: ${data.grand_unification_scores.protagonist_fate}
+  conflict_style: ${data.grand_unification_scores.conflict_style}
+  price_type: ${data.grand_unification_scores.price_type}` : ""}
 medium: "${data.medium}"
 genre_tags: [${data.genre_tags.map((t) => `"${t.replace(/"/g, '"')}"`).join(", ")}]
 tropes: [${data.tropes.map((t) => `"${t.replace(/"/g, '"')}"`).join(", ")}]
