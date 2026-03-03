@@ -51,17 +51,9 @@ The AI agent must read the extracted text file located at `../../books/{Author N
 
 ### Step 2B: Map-Reduce Pipeline (For Exceptionally Large Books)
 
-If a book text is too large to fit effectively into a single context window or you need to ensure rigorous, highly-localized structural extraction across a massive epic, use the `map_reduce.sh` script.
+If a book text is too large to fit effectively into a single context window or you need to ensure rigorous, highly-localized structural extraction across a massive epic, you can orchestrate multiple Gemini sub-agents. 
 
-```bash
-./scripts/map_reduce.sh "../../books/{Author Name}/{Book Title}.txt" "/tmp/findings.txt"
-```
-
-What this does:
-- Splits the massive raw text file into ~150k character chunks.
-- Spawns parallel, headless `gemini` CLI sub-agents for each chunk.
-- Each sub-agent extracts dense structural data, plot events, and character shifts strictly from their assigned local text.
-- Synthesizes all parallel findings into a single `findings.txt` log, which the primary agent then reads to synthesize the final 11-framework JSON.
+See [docs/map-reduce.md](docs/map-reduce.md) for instructions on using the `map_reduce.sh` script to chunk the text and synthesize parallel structural findings.
 
 ### Step 3: Writing the Analysis via Nartopo MCP
 
