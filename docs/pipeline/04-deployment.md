@@ -3,7 +3,7 @@
 Once the Markdown file has been safely injected into the database via the MCP server:
 
 1. **Rebuild the JSON state:**
-   Navigate back to the parent repository and run the Next.js build. This triggers `scripts/generate-works-json.ts`, which reads the newly generated Markdown file, parses its YAML, and regenerates the `works.json` database.
+   Navigate back to the parent repository and run the Next.js build. This triggers `scripts/generate-works-json.ts`, which reads the newly generated Markdown file, parses its YAML, and regenerates `works-index.json` (metadata + scores) and `works-content.json` (slug → prose).
    ```bash
    cd ..
    npm run build

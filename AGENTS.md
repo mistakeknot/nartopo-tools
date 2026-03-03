@@ -72,7 +72,7 @@ The MCP server strictly validates the schema using Zod, templates the Markdown h
 
 ### Step 4: Verification and Deployment
 
-1. Run `npm run build` in the parent Nartopo repo. This triggers `scripts/generate-works-json.ts` which reads the newly generated Markdown files and rebuilds the `works.json` database, followed by compiling the static Next.js pages.
+1. Run `npm run build` in the parent Nartopo repo. This triggers `scripts/generate-works-json.ts` which reads the newly generated Markdown files and rebuilds `works-index.json` (metadata + scores) and `works-content.json` (slug → prose), followed by compiling the static Next.js pages.
 2. Commit the new markdown file in the Nartopo repo: `git add data/{file}.md && git commit -m "data: add {Author} - {Title} structural analysis"`.
 
 ## Bypassing Cloudflare 403 Errors

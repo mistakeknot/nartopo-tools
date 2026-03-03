@@ -151,7 +151,7 @@ const AddAnalysisSchema = z.object({
       }),
     })
     .describe(
-      "Content for the markdown headers. Do NOT include Corporate Vampire Arc.",
+      "Content for the markdown headers (11 frameworks).",
     ),
 });
 
