@@ -45,9 +45,23 @@ What this does:
 - Unzips the EPUB and extracts all chapters to a raw `Book Title.txt` file.
 - Generates a blank markdown template in `../data/` with the correct slug.
 
-### Step 2: Context Loading and Analysis
+### Step 2A: Context Loading and Analysis (Standard)
 
 The AI agent must read the extracted text file located at `../../books/{Author Name}/{Book Title}.txt` into its context window. Based on this raw text, the agent will analyze the book against the 11 frameworks (see `../data/_frameworks.md`) and score its six quadrant axes (Time Linearity, Pacing Velocity, Threat Scale, Protagonist Fate, Conflict Style, Price Type) on a 0.0–1.0 float scale.
+
+### Step 2B: Map-Reduce Pipeline (For Exceptionally Large Books)
+
+If a book text is too large to fit effectively into a single context window or you need to ensure rigorous, highly-localized structural extraction across a massive epic, use the `map_reduce.sh` script.
+
+```bash
+./scripts/map_reduce.sh "../../books/{Author Name}/{Book Title}.txt" "/tmp/findings.txt"
+```
+
+What this does:
+- Splits the massive raw text file into ~150k character chunks.
+- Spawns parallel, headless `gemini` CLI sub-agents for each chunk.
+- Each sub-agent extracts dense structural data, plot events, and character shifts strictly from their assigned local text.
+- Synthesizes all parallel findings into a single `findings.txt` log, which the primary agent then reads to synthesize the final 11-framework JSON.
 
 ### Step 3: Writing the Analysis via Nartopo MCP
 
