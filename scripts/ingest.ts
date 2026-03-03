@@ -8,8 +8,8 @@ import AdmZip from "adm-zip";
 import { convert } from "html-to-text";
 import dotenv from "dotenv";
 
-// Load environment variables from ../books/.env
-const ENV_PATH = path.resolve(__dirname, "../../books/.env");
+// Load environment variables from ../../../books/.env
+const ENV_PATH = path.resolve(__dirname, "../../../books/.env");
 if (fs.existsSync(ENV_PATH)) {
   dotenv.config({ path: ENV_PATH });
 }
@@ -111,7 +111,7 @@ async function main() {
     process.exit(1);
   }
 
-  const authorDir = path.resolve(__dirname, "../../books", author);
+  const authorDir = path.resolve(__dirname, "../../../books", author);
   if (!fs.existsSync(authorDir)) {
     fs.mkdirSync(authorDir, { recursive: true });
   }
