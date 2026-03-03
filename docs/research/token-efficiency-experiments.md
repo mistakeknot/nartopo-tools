@@ -25,13 +25,13 @@ When performing structural analysis on large books, brute-force context loading 
   * *MiniLM RAG:* ~17,500 tokens (**92.1% savings**, but critically flawed analysis)
   * *Nomic RAG:* ~70,000 tokens (**68.2% savings**, slightly better but still misses pacing)
 
-## 5. The Ultimate Optimization: The "Grand Unification" Meta-Hybrid Pipeline
+## 5. The Ultimate Optimization: NTSMR (Narrative Topology Semantic Map Reduce)
 * **Method:** Combining the successes of Map-Reduce with sliding-window continuous context, local FAISS micro-indexing (hybrid index), and rigid JSONL data structures.
 * **Result:** **A scalable, mathematically rigorous structural timeline.** The sub-agents output highly compressed, strict JSON Lines of events tagged by structural category (e.g. `action`, `dialogue`). This eliminates LLM "vibe" bias from pacing analysis entirely—the final agent simply algorithms the ratio of the tags. The results were nearly identical to the brute force method, achieving the same 0.85 Pacing Velocity ("Observational") score for *Solaris* based on tag ratios.
 * **Cost (Tokens):**
   * *Hybrid Index Overhead:* Drops token consumption per chunk by only indexing relevant semantic connective tissue (yielding an estimated 43% savings).
   * *Sliding Window Overhead:* Adds ~5,000 tokens of running-summary overlap across the entire book to guarantee perfect continuity.
-  * *Grand Unification Total for Solaris:* ~57,400 tokens (**~40.4% savings** while perfectly matching brute-force accuracy).
+  * *NTSMR Total for Solaris:* ~57,400 tokens (**~40.4% savings** while perfectly matching brute-force accuracy).
 
 ---
-**Conclusion:** For optimal balance of token-efficiency and structural accuracy, use the **Grand Unification** methodology (see `experiment_grand_unification.py`). It guarantees >40% token savings on massive epics without compromising the structural pacing read.
+**Conclusion:** For optimal balance of token-efficiency and structural accuracy, use the **NTSMR** methodology (see `semantic_map_reduce.py`). It guarantees >40% token savings on massive epics without compromising the structural pacing read.

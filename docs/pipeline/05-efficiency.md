@@ -1,12 +1,12 @@
-# 5. Pipeline Efficiency & Semantic Map-Reduce
+# 5. Pipeline Efficiency & NTSMR
 
 For accurate Nartopo analysis on large texts, you must balance context limits with structural fidelity.
 
 Our research (see `../research/token-efficiency-experiments.md`) demonstrated that simple RAG extraction destroys the ability to measure pacing, while brute-forcing the entire text is computationally and financially expensive.
 
-To achieve optimal token-efficiency without sacrificing structural accuracy, use the **Semantic Map-Reduce** methodology.
+To achieve optimal token-efficiency without sacrificing structural accuracy, use the **NTSMR (Narrative Topology Semantic Map Reduce)** methodology.
 
-## The Semantic Map-Reduce Pipeline
+## The NTSMR Pipeline
 
 This is a Meta-Hybrid approach combining:
 1. **Map-Reduce:** Splitting the massive text into 150k-character macro-chunks.
