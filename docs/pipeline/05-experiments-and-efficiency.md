@@ -20,5 +20,7 @@ When performing structural analysis on large books (e.g., 300k+ characters), bru
 * **Method:** Chunked the book and used local embedding models (`all-MiniLM-L6-v2` and `nomic-embed-text`) to retrieve snippets matching structural keywords (e.g., "inciting incident", "climax").
 * **Result:** **Structurally Inadequate.** While this successfully dropped token consumption by 68-92% (e.g., extracting only 70k-280k characters), it completely destroyed the agent's ability to analyze pacing, narrative duration, and atmospheric tone. It surfaced the main plot beats but missed the "boring" connective tissue that defines the actual structure of the novel. RAG is excellent for factual QA, but useless for holistic structural mapping.
 
----
-**Conclusion:** For accurate Nartopo analysis, you must read the entire text. To bypass context limitations, use the **Map-Reduce** pipeline documented in `02b-map-reduce.md`.
+## 5. Future Investigations: Hybrid Methods
+While the Map-Reduce pipeline currently produces the best quality at the expense of horizontal token volume, future development could explore:
+* **Sliding Window Summarization:** Agent 2 receives Chunk 2 *plus* the structural summary from Agent 1. This guarantees continuity across chunk boundaries.
+* **Intermediate JSONL Generation:** Sub-agents extract strictly formatted `{"type": "action|dialogue", "summary": "..."}` event timelines rather than prose bullet points, allowing the primary agent to algorithmically calculate pacing and velocity (e.g. counting the ratio of action vs dialogue events) without needing to synthetically reason over raw summaries.
