@@ -145,7 +145,8 @@ quadrant_scores:
   protagonist_fate: ${data.quadrant_scores.protagonist_fate}
   conflict_style: ${data.quadrant_scores.conflict_style}
   price_type: ${data.quadrant_scores.price_type}
-${optionalScores}medium: "${data.medium}"
+${optionalScores}
+medium: "${data.medium}"
 genre_tags: [${data.genre_tags.map((t) => `"${escapeYaml(t)}"`).join(", ")}]
 tropes: [${data.tropes.map((t) => `"${escapeYaml(t)}"`).join(", ")}]
 analysis_metadata:
