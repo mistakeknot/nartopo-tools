@@ -9,8 +9,10 @@ import os
 # 1. Hugo Award Best Novel Winners (Wikipedia)
 # 2. Nebula Award Best Novel Winners (Wikipedia)
 # 3. Locus Award for Best Science Fiction Novel (Wikipedia)
-# 4. NPR Top 100 Sci-Fi/Fantasy (Hardcoded knowledge)
-# 5. Locus All-Time Best SF Novel Poll (Hardcoded knowledge)
+# 4. Arthur C. Clarke Award Winners (Wikipedia)
+# 5. BSFA Award for Best Novel (Wikipedia)
+# 6. NPR Top 100 Sci-Fi/Fantasy (Hardcoded knowledge)
+# 7. Locus All-Time Best SF Novel Poll (Hardcoded knowledge)
 
 books = []
 
@@ -33,6 +35,10 @@ for table in tables:
             if len(novel) > 2 and len(author) > 2 and "Author" not in author and "Novel" not in novel:
                 year_text = cols[0].get_text(strip=True)[:4]
                 if year_text.isdigit():
+                    # Only append winners (the first row for each year usually, or we can just append all and let the frequency counter handle it, 
+                    # but to keep it strictly 'winners/highly acclaimed', we will append all since even nominations are huge).
+                    # Actually, for these Wikipedia tables, the winner is typically the first row for the year.
+                    # We'll just grab everything; being nominated for a Hugo + Nebula + Locus is just as strong a signal.
                     books.append((author, novel))
 
 print("Fetching Nebula Award winners...")
@@ -76,6 +82,44 @@ for table in tables:
                 year_text = cols[0].get_text(strip=True)[:4]
                 if year_text.isdigit():
                     books.append((author, novel))
+
+print("Fetching Arthur C. Clarke Award winners...")
+clarke_url = "https://en.wikipedia.org/wiki/Arthur_C._Clarke_Award"
+req = urllib.request.Request(clarke_url, headers={'User-Agent': 'Mozilla/5.0'})
+html = urllib.request.urlopen(req).read().decode('utf-8')
+soup = BeautifulSoup(html, 'html.parser')
+
+tables = soup.find_all('table', class_='wikitable')
+for table in tables:
+    rows = table.find_all('tr')
+    for row in rows:
+        cols = row.find_all(['th', 'td'])
+        if len(cols) >= 3:
+            author_cell = cols[1]
+            novel_cell = cols[2]
+            author = author_cell.get_text(strip=True).replace('*', '').split('[')[0]
+            novel = novel_cell.get_text(strip=True).replace('*', '').split('[')[0]
+            if len(novel) > 2 and len(author) > 2 and "Author" not in author and "Novel" not in novel:
+                 books.append((author, novel))
+
+print("Fetching BSFA Award winners...")
+bsfa_url = "https://en.wikipedia.org/wiki/BSFA_Award_for_Best_Novel"
+req = urllib.request.Request(bsfa_url, headers={'User-Agent': 'Mozilla/5.0'})
+html = urllib.request.urlopen(req).read().decode('utf-8')
+soup = BeautifulSoup(html, 'html.parser')
+
+tables = soup.find_all('table', class_='wikitable')
+for table in tables:
+    rows = table.find_all('tr')
+    for row in rows:
+        cols = row.find_all(['th', 'td'])
+        if len(cols) >= 3:
+            author_cell = cols[1]
+            novel_cell = cols[2]
+            author = author_cell.get_text(strip=True).replace('*', '').split('[')[0]
+            novel = novel_cell.get_text(strip=True).replace('*', '').split('[')[0]
+            if len(novel) > 2 and len(author) > 2 and "Author" not in author and "Novel" not in novel:
+                 books.append((author, novel))
 
 print("Adding NPR Top Sci-Fi & Locus All-Time Best SF Novel Poll lists...")
 

@@ -15,6 +15,11 @@
     "list_appearances": 4
   },
   {
+    "author": "Arthur C. Clarke",
+    "title": "Rendezvous with Rama",
+    "list_appearances": 4
+  },
+  {
     "author": "Orson Scott Card",
     "title": "Ender's Game",
     "list_appearances": 4
@@ -22,6 +27,11 @@
   {
     "author": "Orson Scott Card",
     "title": "Speaker for the Dead",
+    "list_appearances": 4
+  },
+  {
+    "author": "Ann Leckie",
+    "title": "Ancillary Justice",
     "list_appearances": 4
   },
   {
@@ -40,13 +50,13 @@
     "list_appearances": 3
   },
   {
-    "author": "Isaac Asimov",
-    "title": "The Gods Themselves",
+    "author": "John Brunner",
+    "title": "Stand on Zanzibar",
     "list_appearances": 3
   },
   {
-    "author": "Arthur C. Clarke",
-    "title": "Rendezvous with Rama",
+    "author": "Isaac Asimov",
+    "title": "The Gods Themselves",
     "list_appearances": 3
   },
   {
@@ -100,6 +110,11 @@
     "list_appearances": 3
   },
   {
+    "author": "Kim Stanley Robinson",
+    "title": "Red Mars",
+    "list_appearances": 3
+  },
+  {
     "author": "Alfred Bester",
     "title": "The Demolished Man",
     "list_appearances": 2
@@ -112,11 +127,6 @@
   {
     "author": "Roger Zelazny",
     "title": "Lord of Light",
-    "list_appearances": 2
-  },
-  {
-    "author": "John Brunner",
-    "title": "Stand on Zanzibar",
     "list_appearances": 2
   },
   {
@@ -210,11 +220,6 @@
     "list_appearances": 2
   },
   {
-    "author": "Ann Leckie",
-    "title": "Ancillary Justice",
-    "list_appearances": 2
-  },
-  {
     "author": "N. K. Jemisin",
     "title": "The Stone Sky",
     "list_appearances": 2
@@ -225,13 +230,78 @@
     "list_appearances": 2
   },
   {
+    "author": "Gregory Benford",
+    "title": "Timescape",
+    "list_appearances": 2
+  },
+  {
     "author": "Connie Willis",
     "title": "Doomsday Book",
     "list_appearances": 2
   },
   {
-    "author": "Kim Stanley Robinson",
-    "title": "Red Mars",
+    "author": "Dan Simmons",
+    "title": "The Fall of Hyperion",
+    "list_appearances": 2
+  },
+  {
+    "author": "Ann Leckie",
+    "title": "Ancillary Sword",
+    "list_appearances": 2
+  },
+  {
+    "author": "Margaret Atwood",
+    "title": "The Handmaid's Tale",
+    "list_appearances": 2
+  },
+  {
+    "author": "Queen of the States",
+    "title": "The Women's Press",
+    "list_appearances": 2
+  },
+  {
+    "author": "Colin Greenland",
+    "title": "Take Back Plenty",
+    "list_appearances": 2
+  },
+  {
+    "author": "Lost Futures",
+    "title": "Grafton",
+    "list_appearances": 2
+  },
+  {
+    "author": "Ammonite",
+    "title": "Grafton",
+    "list_appearances": 2
+  },
+  {
+    "author": "Mary Doria Russell",
+    "title": "The Sparrow",
+    "list_appearances": 2
+  },
+  {
+    "author": "Christopher Priest",
+    "title": "The Separation",
+    "list_appearances": 2
+  },
+  {
+    "author": "The Years of Rice and Salt",
+    "title": "HarperCollins",
+    "list_appearances": 2
+  },
+  {
+    "author": "Geoff Ryman",
+    "title": "Air",
+    "list_appearances": 2
+  },
+  {
+    "author": "A Closed and Common Orbit",
+    "title": "Hodder & Stoughton",
+    "list_appearances": 2
+  },
+  {
+    "author": "The Coral Bones",
+    "title": "Unsung Stories",
     "list_appearances": 2
   },
   {
@@ -427,76 +497,6 @@
   {
     "author": "2004",
     "title": "Ray Bradbury",
-    "list_appearances": 1
-  },
-  {
-    "author": "Samuel R. Delany",
-    "title": "Babel-17",
-    "list_appearances": 1
-  },
-  {
-    "author": "Samuel R. Delany",
-    "title": "The Einstein Intersection",
-    "list_appearances": 1
-  },
-  {
-    "author": "Alexei Panshin",
-    "title": "Rite of Passage",
-    "list_appearances": 1
-  },
-  {
-    "author": "Robert Silverberg",
-    "title": "A Time of Changes",
-    "list_appearances": 1
-  },
-  {
-    "author": "Frederik Pohl",
-    "title": "Man Plus",
-    "list_appearances": 1
-  },
-  {
-    "author": "Gregory Benford",
-    "title": "Timescape",
-    "list_appearances": 1
-  },
-  {
-    "author": "Gene Wolfe",
-    "title": "The Claw of the Conciliator",
-    "list_appearances": 1
-  },
-  {
-    "author": "Michael Bishop",
-    "title": "No Enemy But Time",
-    "list_appearances": 1
-  },
-  {
-    "author": "Pat Murphy",
-    "title": "The Falling Woman",
-    "list_appearances": 1
-  },
-  {
-    "author": "Lois McMaster Bujold",
-    "title": "Falling Free",
-    "list_appearances": 1
-  },
-  {
-    "author": "Elizabeth Ann Scarborough",
-    "title": "The Healer's War",
-    "list_appearances": 1
-  },
-  {
-    "author": "Ursula K. Le Guin",
-    "title": "Tehanu: The Last Book of Earthsea",
-    "list_appearances": 1
-  },
-  {
-    "author": "Michael Swanwick",
-    "title": "Stations of the Tide",
-    "list_appearances": 1
-  },
-  {
-    "author": "Greg Bear",
-    "title": "Moving Mars",
     "list_appearances": 1
   }
 ]
