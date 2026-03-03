@@ -1,502 +1,502 @@
 [
   {
-    "author": "David Brin",
-    "title": "Startide Rising",
-    "awards_count": 3
-  },
-  {
-    "author": "Orson Scott Card",
-    "title": "Speaker for the Dead",
-    "awards_count": 3
-  },
-  {
-    "author": "Michael Chabon",
-    "title": "The Yiddish Policemen's Union",
-    "awards_count": 3
-  },
-  {
-    "author": "Connie Willis",
-    "title": "Blackout/All Clear",
-    "awards_count": 3
-  },
-  {
-    "author": "Mary Robinette Kowal",
-    "title": "The Calculating Stars",
-    "awards_count": 3
-  },
-  {
-    "author": "Martha Wells",
-    "title": "Network Effect",
-    "awards_count": 3
-  },
-  {
     "author": "Frank Herbert",
     "title": "Dune",
-    "awards_count": 2
+    "list_appearances": 3
   },
   {
     "author": "Ursula K. Le Guin",
     "title": "The Left Hand of Darkness",
-    "awards_count": 2
+    "list_appearances": 3
   },
   {
     "author": "Larry Niven",
     "title": "Ringworld",
-    "awards_count": 2
-  },
-  {
-    "author": "Isaac Asimov",
-    "title": "The Gods Themselves",
-    "awards_count": 2
+    "list_appearances": 3
   },
   {
     "author": "Arthur C. Clarke",
     "title": "Rendezvous with Rama",
-    "awards_count": 2
+    "list_appearances": 3
   },
   {
-    "author": "Joe Haldeman",
-    "title": "The Forever War",
-    "awards_count": 2
-  },
-  {
-    "author": "Frederik Pohl",
-    "title": "Gateway",
-    "awards_count": 2
-  },
-  {
-    "author": "Vonda N. McIntyre",
-    "title": "Dreamsnake",
-    "awards_count": 2
-  },
-  {
-    "author": "Arthur C. Clarke",
-    "title": "The Fountains of Paradise",
-    "awards_count": 2
-  },
-  {
-    "author": "Joan D. Vinge",
-    "title": "The Snow Queen",
-    "awards_count": 2
-  },
-  {
-    "author": "Isaac Asimov",
-    "title": "Foundation's Edge",
-    "awards_count": 2
+    "author": "David Brin",
+    "title": "Startide Rising",
+    "list_appearances": 3
   },
   {
     "author": "Orson Scott Card",
     "title": "Ender's Game",
-    "awards_count": 2
+    "list_appearances": 3
   },
   {
-    "author": "David Brin",
-    "title": "The Uplift War",
-    "awards_count": 2
-  },
-  {
-    "author": "C. J. Cherryh",
-    "title": "Cyteen",
-    "awards_count": 2
-  },
-  {
-    "author": "Dan Simmons",
-    "title": "Hyperion",
-    "awards_count": 2
-  },
-  {
-    "author": "Lois McMaster Bujold",
-    "title": "Barrayar",
-    "awards_count": 2
-  },
-  {
-    "author": "Kim Stanley Robinson",
-    "title": "Green Mars",
-    "awards_count": 2
-  },
-  {
-    "author": "Lois McMaster Bujold",
-    "title": "Mirror Dance",
-    "awards_count": 2
+    "author": "Orson Scott Card",
+    "title": "Speaker for the Dead",
+    "list_appearances": 3
   },
   {
     "author": "Neal Stephenson",
     "title": "The Diamond Age",
-    "awards_count": 2
-  },
-  {
-    "author": "Kim Stanley Robinson",
-    "title": "Blue Mars",
-    "awards_count": 2
-  },
-  {
-    "author": "Joe Haldeman",
-    "title": "Forever Peace",
-    "awards_count": 2
+    "list_appearances": 3
   },
   {
     "author": "Connie Willis",
     "title": "To Say Nothing of the Dog",
-    "awards_count": 2
+    "list_appearances": 3
   },
   {
     "author": "Neil Gaiman",
     "title": "American Gods",
-    "awards_count": 2
+    "list_appearances": 3
   },
   {
-    "author": "Lois McMaster Bujold",
-    "title": "Paladin of Souls",
-    "awards_count": 2
-  },
-  {
-    "author": "Vernor Vinge",
-    "title": "Rainbows End",
-    "awards_count": 2
+    "author": "Michael Chabon",
+    "title": "The Yiddish Policemen's Union",
+    "list_appearances": 3
   },
   {
     "author": "Paolo Bacigalupi",
     "title": "The Windup Girl",
-    "awards_count": 2
+    "list_appearances": 3
   },
   {
-    "author": "Jo Walton",
-    "title": "Among Others",
-    "awards_count": 2
-  },
-  {
-    "author": "John Scalzi",
-    "title": "Redshirts",
-    "awards_count": 2
+    "author": "Connie Willis",
+    "title": "Blackout/All Clear",
+    "list_appearances": 3
   },
   {
     "author": "Ann Leckie",
     "title": "Ancillary Justice",
-    "awards_count": 2
+    "list_appearances": 3
   },
   {
-    "author": "N. K. Jemisin",
-    "title": "The Stone Sky",
-    "awards_count": 2
+    "author": "Mary Robinette Kowal",
+    "title": "The Calculating Stars",
+    "list_appearances": 3
   },
   {
-    "author": "Arkady Martine",
-    "title": "A Desolation Called Peace",
-    "awards_count": 2
+    "author": "Martha Wells",
+    "title": "Network Effect",
+    "list_appearances": 3
   },
   {
     "author": "Connie Willis",
     "title": "Doomsday Book",
-    "awards_count": 2
+    "list_appearances": 3
   },
   {
     "author": "Alfred Bester",
     "title": "The Demolished Man",
-    "awards_count": 1
-  },
-  {
-    "author": "Mark Clifton",
-    "title": "They'd Rather Be Right(also known asThe Forever Machine)",
-    "awards_count": 1
-  },
-  {
-    "author": "Robert A. Heinlein",
-    "title": "Double Star",
-    "awards_count": 1
-  },
-  {
-    "author": "Fritz Leiber",
-    "title": "The Big Time",
-    "awards_count": 1
-  },
-  {
-    "author": "James Blish",
-    "title": "A Case of Conscience",
-    "awards_count": 1
+    "list_appearances": 2
   },
   {
     "author": "Robert A. Heinlein",
     "title": "Starship Troopers",
-    "awards_count": 1
+    "list_appearances": 2
   },
   {
     "author": "Walter M. Miller, Jr.",
     "title": "A Canticle for Leibowitz",
-    "awards_count": 1
+    "list_appearances": 2
   },
   {
     "author": "Robert A. Heinlein",
     "title": "Stranger in a Strange Land",
-    "awards_count": 1
+    "list_appearances": 2
   },
   {
     "author": "Philip K. Dick",
     "title": "The Man in the High Castle",
-    "awards_count": 1
-  },
-  {
-    "author": "Clifford D. Simak",
-    "title": "Here Gather the Stars(also known asWay Station)",
-    "awards_count": 1
-  },
-  {
-    "author": "Fritz Leiber",
-    "title": "The Wanderer",
-    "awards_count": 1
+    "list_appearances": 2
   },
   {
     "author": "Robert A. Heinlein",
     "title": "The Moon Is a Harsh Mistress",
-    "awards_count": 1
+    "list_appearances": 2
   },
   {
-    "author": "Roger Zelazny",
-    "title": "Lord of Light",
-    "awards_count": 1
+    "author": "Isaac Asimov",
+    "title": "The Gods Themselves",
+    "list_appearances": 2
   },
   {
-    "author": "John Brunner",
-    "title": "Stand on Zanzibar",
-    "awards_count": 1
+    "author": "Joe Haldeman",
+    "title": "The Forever War",
+    "list_appearances": 2
   },
   {
-    "author": "Philip Jos\u00e9 Farmer",
-    "title": "To Your Scattered Bodies Go",
-    "awards_count": 1
+    "author": "Frederik Pohl",
+    "title": "Gateway",
+    "list_appearances": 2
   },
   {
-    "author": "Kate Wilhelm",
-    "title": "Where Late the Sweet Birds Sang",
-    "awards_count": 1
+    "author": "Vonda N. McIntyre",
+    "title": "Dreamsnake",
+    "list_appearances": 2
+  },
+  {
+    "author": "Arthur C. Clarke",
+    "title": "The Fountains of Paradise",
+    "list_appearances": 2
+  },
+  {
+    "author": "Joan D. Vinge",
+    "title": "The Snow Queen",
+    "list_appearances": 2
+  },
+  {
+    "author": "Isaac Asimov",
+    "title": "Foundation's Edge",
+    "list_appearances": 2
+  },
+  {
+    "author": "David Brin",
+    "title": "The Uplift War",
+    "list_appearances": 2
   },
   {
     "author": "C. J. Cherryh",
-    "title": "Downbelow Station",
-    "awards_count": 1
+    "title": "Cyteen",
+    "list_appearances": 2
+  },
+  {
+    "author": "Dan Simmons",
+    "title": "Hyperion",
+    "list_appearances": 2
   },
   {
     "author": "Lois McMaster Bujold",
-    "title": "The Vor Game",
-    "awards_count": 1
+    "title": "Barrayar",
+    "list_appearances": 2
   },
   {
     "author": "Vernor Vinge",
     "title": "A Fire Upon the Deep",
-    "awards_count": 1
+    "list_appearances": 2
   },
   {
-    "author": "Vernor Vinge",
-    "title": "A Deepness in the Sky",
-    "awards_count": 1
-  },
-  {
-    "author": "J. K. Rowling",
-    "title": "Harry Potter and the Goblet of Fire",
-    "awards_count": 1
-  },
-  {
-    "author": "Robert J. Sawyer",
-    "title": "Hominids",
-    "awards_count": 1
-  },
-  {
-    "author": "Susanna Clarke",
-    "title": "Jonathan Strange & Mr Norrell",
-    "awards_count": 1
-  },
-  {
-    "author": "Robert Charles Wilson",
-    "title": "Spin",
-    "awards_count": 1
-  },
-  {
-    "author": "Neil Gaiman",
-    "title": "The Graveyard Book",
-    "awards_count": 1
-  },
-  {
-    "author": "Cixin Liu(Chinese)",
-    "title": "The Three-Body Problem",
-    "awards_count": 1
-  },
-  {
-    "author": "N. K. Jemisin",
-    "title": "The Fifth Season",
-    "awards_count": 1
-  },
-  {
-    "author": "N. K. Jemisin",
-    "title": "The Obelisk Gate",
-    "awards_count": 1
-  },
-  {
-    "author": "Arkady Martine",
-    "title": "A Memory Called Empire",
-    "awards_count": 1
-  },
-  {
-    "author": "Ursula Vernon(as T. Kingfisher)",
-    "title": "Nettle & Bone",
-    "awards_count": 1
-  },
-  {
-    "author": "Emily Tesh",
-    "title": "Some Desperate Glory",
-    "awards_count": 1
-  },
-  {
-    "author": "Robert Jackson Bennett",
-    "title": "The Tainted Cup",
-    "awards_count": 1
-  },
-  {
-    "author": "2014",
-    "title": "T. H. White",
-    "awards_count": 1
-  },
-  {
-    "author": "2016",
-    "title": "A. E. van Vogt",
-    "awards_count": 1
-  },
-  {
-    "author": "2018",
-    "title": "Robert A. Heinlein(as Anson MacDonald)",
-    "awards_count": 1
-  },
-  {
-    "author": "2019",
-    "title": "Fritz Leiber",
-    "awards_count": 1
-  },
-  {
-    "author": "2020",
-    "title": "Leigh Brackett",
-    "awards_count": 1
-  },
-  {
-    "author": "1996",
-    "title": "Isaac Asimov",
-    "awards_count": 1
-  },
-  {
-    "author": "2001",
-    "title": "Robert A. Heinlein",
-    "awards_count": 1
-  },
-  {
-    "author": "2004",
-    "title": "Ray Bradbury",
-    "awards_count": 1
-  },
-  {
-    "author": "Samuel R. Delany",
-    "title": "Babel-17",
-    "awards_count": 1
-  },
-  {
-    "author": "Samuel R. Delany",
-    "title": "The Einstein Intersection",
-    "awards_count": 1
-  },
-  {
-    "author": "Alexei Panshin",
-    "title": "Rite of Passage",
-    "awards_count": 1
-  },
-  {
-    "author": "Robert Silverberg",
-    "title": "A Time of Changes",
-    "awards_count": 1
-  },
-  {
-    "author": "Frederik Pohl",
-    "title": "Man Plus",
-    "awards_count": 1
-  },
-  {
-    "author": "Gregory Benford",
-    "title": "Timescape",
-    "awards_count": 1
-  },
-  {
-    "author": "Gene Wolfe",
-    "title": "The Claw of the Conciliator",
-    "awards_count": 1
-  },
-  {
-    "author": "Michael Bishop",
-    "title": "No Enemy But Time",
-    "awards_count": 1
-  },
-  {
-    "author": "Pat Murphy",
-    "title": "The Falling Woman",
-    "awards_count": 1
+    "author": "Kim Stanley Robinson",
+    "title": "Green Mars",
+    "list_appearances": 2
   },
   {
     "author": "Lois McMaster Bujold",
-    "title": "Falling Free",
-    "awards_count": 1
+    "title": "Mirror Dance",
+    "list_appearances": 2
   },
   {
-    "author": "Elizabeth Ann Scarborough",
-    "title": "The Healer's War",
-    "awards_count": 1
+    "author": "Kim Stanley Robinson",
+    "title": "Blue Mars",
+    "list_appearances": 2
   },
   {
-    "author": "Ursula K. Le Guin",
-    "title": "Tehanu: The Last Book of Earthsea",
-    "awards_count": 1
+    "author": "Joe Haldeman",
+    "title": "Forever Peace",
+    "list_appearances": 2
   },
   {
-    "author": "Michael Swanwick",
-    "title": "Stations of the Tide",
-    "awards_count": 1
+    "author": "Lois McMaster Bujold",
+    "title": "Paladin of Souls",
+    "list_appearances": 2
+  },
+  {
+    "author": "Vernor Vinge",
+    "title": "Rainbows End",
+    "list_appearances": 2
+  },
+  {
+    "author": "Jo Walton",
+    "title": "Among Others",
+    "list_appearances": 2
+  },
+  {
+    "author": "John Scalzi",
+    "title": "Redshirts",
+    "list_appearances": 2
+  },
+  {
+    "author": "N. K. Jemisin",
+    "title": "The Stone Sky",
+    "list_appearances": 2
+  },
+  {
+    "author": "Arkady Martine",
+    "title": "A Desolation Called Peace",
+    "list_appearances": 2
   },
   {
     "author": "Kim Stanley Robinson",
     "title": "Red Mars",
-    "awards_count": 1
+    "list_appearances": 2
+  },
+  {
+    "author": "Kim Stanley Robinson",
+    "title": "The Years of Rice and Salt",
+    "list_appearances": 2
+  },
+  {
+    "author": "George Orwell",
+    "title": "1984",
+    "list_appearances": 2
+  },
+  {
+    "author": "Isaac Asimov",
+    "title": "The Foundation Trilogy",
+    "list_appearances": 2
+  },
+  {
+    "author": "Mark Clifton",
+    "title": "They'd Rather Be Right(also known asThe Forever Machine)",
+    "list_appearances": 1
+  },
+  {
+    "author": "Robert A. Heinlein",
+    "title": "Double Star",
+    "list_appearances": 1
+  },
+  {
+    "author": "Fritz Leiber",
+    "title": "The Big Time",
+    "list_appearances": 1
+  },
+  {
+    "author": "James Blish",
+    "title": "A Case of Conscience",
+    "list_appearances": 1
+  },
+  {
+    "author": "Clifford D. Simak",
+    "title": "Here Gather the Stars(also known asWay Station)",
+    "list_appearances": 1
+  },
+  {
+    "author": "Fritz Leiber",
+    "title": "The Wanderer",
+    "list_appearances": 1
+  },
+  {
+    "author": "Roger Zelazny",
+    "title": "Lord of Light",
+    "list_appearances": 1
+  },
+  {
+    "author": "John Brunner",
+    "title": "Stand on Zanzibar",
+    "list_appearances": 1
+  },
+  {
+    "author": "Philip Jos\u00e9 Farmer",
+    "title": "To Your Scattered Bodies Go",
+    "list_appearances": 1
+  },
+  {
+    "author": "Kate Wilhelm",
+    "title": "Where Late the Sweet Birds Sang",
+    "list_appearances": 1
+  },
+  {
+    "author": "C. J. Cherryh",
+    "title": "Downbelow Station",
+    "list_appearances": 1
+  },
+  {
+    "author": "Lois McMaster Bujold",
+    "title": "The Vor Game",
+    "list_appearances": 1
+  },
+  {
+    "author": "Vernor Vinge",
+    "title": "A Deepness in the Sky",
+    "list_appearances": 1
+  },
+  {
+    "author": "J. K. Rowling",
+    "title": "Harry Potter and the Goblet of Fire",
+    "list_appearances": 1
+  },
+  {
+    "author": "Robert J. Sawyer",
+    "title": "Hominids",
+    "list_appearances": 1
+  },
+  {
+    "author": "Susanna Clarke",
+    "title": "Jonathan Strange & Mr Norrell",
+    "list_appearances": 1
+  },
+  {
+    "author": "Robert Charles Wilson",
+    "title": "Spin",
+    "list_appearances": 1
+  },
+  {
+    "author": "Neil Gaiman",
+    "title": "The Graveyard Book",
+    "list_appearances": 1
+  },
+  {
+    "author": "Cixin Liu(Chinese)",
+    "title": "The Three-Body Problem",
+    "list_appearances": 1
+  },
+  {
+    "author": "N. K. Jemisin",
+    "title": "The Fifth Season",
+    "list_appearances": 1
+  },
+  {
+    "author": "N. K. Jemisin",
+    "title": "The Obelisk Gate",
+    "list_appearances": 1
+  },
+  {
+    "author": "Arkady Martine",
+    "title": "A Memory Called Empire",
+    "list_appearances": 1
+  },
+  {
+    "author": "Ursula Vernon(as T. Kingfisher)",
+    "title": "Nettle & Bone",
+    "list_appearances": 1
+  },
+  {
+    "author": "Emily Tesh",
+    "title": "Some Desperate Glory",
+    "list_appearances": 1
+  },
+  {
+    "author": "Robert Jackson Bennett",
+    "title": "The Tainted Cup",
+    "list_appearances": 1
+  },
+  {
+    "author": "2014",
+    "title": "T. H. White",
+    "list_appearances": 1
+  },
+  {
+    "author": "2016",
+    "title": "A. E. van Vogt",
+    "list_appearances": 1
+  },
+  {
+    "author": "2018",
+    "title": "Robert A. Heinlein(as Anson MacDonald)",
+    "list_appearances": 1
+  },
+  {
+    "author": "2019",
+    "title": "Fritz Leiber",
+    "list_appearances": 1
+  },
+  {
+    "author": "2020",
+    "title": "Leigh Brackett",
+    "list_appearances": 1
+  },
+  {
+    "author": "1996",
+    "title": "Isaac Asimov",
+    "list_appearances": 1
+  },
+  {
+    "author": "2001",
+    "title": "Robert A. Heinlein",
+    "list_appearances": 1
+  },
+  {
+    "author": "2004",
+    "title": "Ray Bradbury",
+    "list_appearances": 1
+  },
+  {
+    "author": "Samuel R. Delany",
+    "title": "Babel-17",
+    "list_appearances": 1
+  },
+  {
+    "author": "Samuel R. Delany",
+    "title": "The Einstein Intersection",
+    "list_appearances": 1
+  },
+  {
+    "author": "Alexei Panshin",
+    "title": "Rite of Passage",
+    "list_appearances": 1
+  },
+  {
+    "author": "Robert Silverberg",
+    "title": "A Time of Changes",
+    "list_appearances": 1
+  },
+  {
+    "author": "Frederik Pohl",
+    "title": "Man Plus",
+    "list_appearances": 1
+  },
+  {
+    "author": "Gregory Benford",
+    "title": "Timescape",
+    "list_appearances": 1
+  },
+  {
+    "author": "Gene Wolfe",
+    "title": "The Claw of the Conciliator",
+    "list_appearances": 1
+  },
+  {
+    "author": "Michael Bishop",
+    "title": "No Enemy But Time",
+    "list_appearances": 1
+  },
+  {
+    "author": "Pat Murphy",
+    "title": "The Falling Woman",
+    "list_appearances": 1
+  },
+  {
+    "author": "Lois McMaster Bujold",
+    "title": "Falling Free",
+    "list_appearances": 1
+  },
+  {
+    "author": "Elizabeth Ann Scarborough",
+    "title": "The Healer's War",
+    "list_appearances": 1
+  },
+  {
+    "author": "Ursula K. Le Guin",
+    "title": "Tehanu: The Last Book of Earthsea",
+    "list_appearances": 1
+  },
+  {
+    "author": "Michael Swanwick",
+    "title": "Stations of the Tide",
+    "list_appearances": 1
   },
   {
     "author": "Greg Bear",
     "title": "Moving Mars",
-    "awards_count": 1
+    "list_appearances": 1
   },
   {
     "author": "Robert J. Sawyer",
     "title": "The Terminal Experiment",
-    "awards_count": 1
+    "list_appearances": 1
   },
   {
     "author": "Nicola Griffith",
     "title": "Slow River",
-    "awards_count": 1
+    "list_appearances": 1
   },
   {
     "author": "Vonda N. McIntyre",
     "title": "The Moon and the Sun",
-    "awards_count": 1
+    "list_appearances": 1
   },
   {
     "author": "Octavia E. Butler",
     "title": "Parable of the Talents",
-    "awards_count": 1
-  },
-  {
-    "author": "Greg Bear",
-    "title": "Darwin's Radio",
-    "awards_count": 1
-  },
-  {
-    "author": "Catherine Asaro",
-    "title": "The Quantum Rose",
-    "awards_count": 1
-  },
-  {
-    "author": "Elizabeth Moon",
-    "title": "The Speed of Dark",
-    "awards_count": 1
+    "list_appearances": 1
   }
 ]
