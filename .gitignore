@@ -1,0 +1,10 @@
+node_modules/
+*.epub
+*.pdf
+*.txt
+!CMakeLists.txt
+.env
+.env.*
+__pycache__/
+*.pyc
+.DS_Store
