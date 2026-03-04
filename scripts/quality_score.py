@@ -22,6 +22,7 @@ SCORE_METHODS = [
     "semantic_map_reduce_scores",
     "grand_unification_scores",
     "sliding_context_scores",
+    "model_tiering_scores",
 ]
 
 AXES = [
