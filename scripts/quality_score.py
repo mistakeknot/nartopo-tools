@@ -21,6 +21,7 @@ SCORE_METHODS = [
     "sliding_window_scores",
     "semantic_map_reduce_scores",
     "grand_unification_scores",
+    "sliding_context_scores",
 ]
 
 AXES = [
