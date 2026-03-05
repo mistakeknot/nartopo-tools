@@ -23,6 +23,7 @@ SCORE_METHODS = [
     "sliding_context_scores",
     "model_tiering_scores",
     "enriched_schema_scores",
+    "adaptive_chunking_scores",
 ]
 
 AXES = [
