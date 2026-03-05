@@ -112,7 +112,7 @@ async def process_chunk(chunk_idx, micro_chunks, keywords, global_outline, book_
     print(f"[{chunk_idx}] Invoking Gemini CLI for extraction...")
     ext_start = time.time()
     
-    schema_instruction = '{"type": "action"|"dialogue"|"exposition"|"bureaucracy", "summary": "Brief 1-sentence summary"}'
+    schema_instruction = '{"type": "action"|"dialogue"|"exposition"|"bureaucracy", "framework_signals": ["todorov:disruption", "freytag:climax"], "summary": "Brief 1-sentence summary"}'
 
     prompt = f"""You are a structural analysis sub-agent analyzing Chunk {chunk_idx}.
 
@@ -126,11 +126,25 @@ Task:
 Extract the major structural beats from the snippets and output them as strict JSON Lines (JSONL).
 Do not hallucinate events outside these snippets. Use the global outline only for understanding context and character identities.
 
+Additionally, tag each event with relevant narrative framework signals.
+Add a "framework_signals" array to each JSON line using this vocabulary:
+- todorov:{{equilibrium,disruption,recognition,repair,new_equilibrium}}
+- freytag:{{exposition,rising_action,climax,falling_action,denouement}}
+- actantial:{{subject,object,sender,receiver,helper,opponent}}
+- three_act:{{setup,confrontation,resolution}}
+- monomyth:{{ordinary_world,call,threshold,ordeal,return}}
+- harmon:{{you,need,go,search,find,take,return,change}}
+- kishotenketsu:{{ki,sho,ten,ketsu}}
+- aristotle:{{hamartia,peripeteia,anagnorisis}}
+- protocol:{{rule,failure,insight}}
+
+Format: "framework:stage". Include 1-5 relevant signals per event. Omit if none apply.
+
 Schema: {schema_instruction}
 
 Format your response EXACTLY like this (do not use markdown blocks for the JSON):
 ## JSONL
-{{"type": "...", "summary": "..."}}
+{{"type": "...", "framework_signals": ["..."], "summary": "..."}}
 """
 
     output = await run_gemini_cli(prompt)
@@ -275,63 +289,289 @@ async def extract_dynamic_keywords(outline):
         print(f"    - {kw}")
     return keywords
 
-async def synthesize_frameworks(full_jsonl):
-    t0 = time.time()
-    print("\n--- Phase 3: Synthesizing Frameworks ---")
+FRAMEWORK_SYNTHESIS_PROMPTS = {
+    "Todorov's Equilibrium": {
+        "filter_tag": "todorov",
+        "prompt_suffix": """Identify the five stages of Todorov's narrative equilibrium model.
 
-    frameworks = [
-        "Todorov's Equilibrium",
-        "Actantial Model",
-        "Quadrant Scores",
-        "Lévi-Strauss's Binary Oppositions",
-        "Cognitive Estrangement",
-        "Bakhtin's Chronotope",
-        "Aristotelian Poetics",
-        "Jungian Archetypal Analysis",
-        "Genette's Transtextuality"
-    ]
+Output as JSON:
+{{
+  "equilibrium": "Description of the starting status quo",
+  "disruption": "The inciting incident or protocol failure",
+  "recognition": "When the protagonist realizes the disruption",
+  "repair": "The attempt to fix or survive it",
+  "new_equilibrium": "The new, altered status quo"
+}}""",
+    },
+    "Actantial Model": {
+        "filter_tag": "actantial",
+        "prompt_suffix": """Identify the six actantial roles from Greimas's model.
 
-    async def synthesize_single(fw):
-        fw_start = time.time()
-        print(f"Synthesizing: {fw}...")
-
-        prompt = f"""You are a Synthesis Sub-Agent specializing in {fw}.
-
-Here is the structural event timeline of the novel:
-{full_jsonl}
-
-Task:
-Analyze the timeline and output ONLY the {fw} mapping in valid JSON format.
-"""
-        if fw == "Quadrant Scores":
-            prompt += """
-Specifically, output exactly 6 floats between 0.0 and 1.0 for these metrics based on the timeline's pacing, conflict types, and plot structure:
+Output as JSON:
+{{
+  "subject": "The protagonist pursuing the central goal",
+  "object": "What the subject seeks or desires",
+  "sender": "The force/entity that initiates or compels the quest",
+  "receiver": "Who/what benefits from the quest's completion",
+  "helper": "Allies and enabling forces",
+  "opponent": "Antagonistic forces and obstacles"
+}}""",
+    },
+    "Quadrant Scores": {
+        "filter_tag": None,
+        "prompt_suffix": """Specifically, output exactly 6 floats between 0.0 and 1.0 for these metrics based on the timeline's pacing, conflict types, and plot structure:
 - time_linearity: 0.0=Linear, 1.0=Fractured
 - pacing_velocity: 0.0=Action-Driven, 1.0=Observational
 - threat_scale: 0.0=Individual, 1.0=Systemic
 - protagonist_fate: 0.0=Victory, 1.0=Assimilation
-- conflict_style: 0.0=Western Combat, 1.0=Kishōtenketsu
+- conflict_style: 0.0=Western Combat, 1.0=Kishotenketsu
 - price_type: 0.0=Physical, 1.0=Ideological
 
 Format the output strictly as JSON:
-{
+{{
   "time_linearity": 0.0,
   "pacing_velocity": 0.0,
   "threat_scale": 0.0,
   "protagonist_fate": 0.0,
   "conflict_style": 0.0,
   "price_type": 0.0
+}}""",
+    },
+    "The Freytag Pyramid": {
+        "filter_tag": "freytag",
+        "prompt_suffix": """Map the narrative arc to Freytag's five dramatic stages.
+
+Output as JSON:
+{{
+  "exposition": "Setup of world, characters, initial situation",
+  "rising_action": "Key complications and escalation toward the turning point",
+  "climax": "The decisive turning point or moment of highest tension",
+  "falling_action": "Consequences and unwinding after the climax",
+  "denouement": "Final resolution and the new state of affairs"
+}}""",
+    },
+    "The Three-Act Structure": {
+        "filter_tag": "three_act",
+        "prompt_suffix": """Map the narrative to the three-act structure, identifying the two key plot points.
+
+Output as JSON:
+{{
+  "act_1_setup": "The world, characters, and status quo before the inciting incident",
+  "plot_point_1": "The event that launches the protagonist into the central conflict",
+  "act_2_confrontation": "The escalating obstacles, complications, and midpoint reversal",
+  "plot_point_2": "The crisis that forces the final confrontation",
+  "act_3_resolution": "The climax and its aftermath"
+}}""",
+    },
+    "The Monomyth": {
+        "filter_tag": "monomyth",
+        "prompt_suffix": """Analyze how this narrative relates to Campbell's Hero's Journey. Focus on how the work subverts or departs from the monomyth template.
+
+Output as JSON:
+{{
+  "applicable_stages": ["List the monomyth stages that appear in this narrative"],
+  "subversions": "How does this work depart from or subvert the traditional Hero's Journey?"
+}}""",
+    },
+    "Dan Harmon's Story Circle": {
+        "filter_tag": "harmon",
+        "prompt_suffix": """Analyze the narrative through Dan Harmon's 8-step Story Circle. Focus on 'The Take' -- the price paid for the journey.
+
+Output as JSON:
+{{
+  "circle_stages": {{
+    "you": "Character in comfort zone",
+    "need": "What they want/need",
+    "go": "Entering unfamiliar territory",
+    "search": "Adapting to the new situation",
+    "find": "Getting what they wanted",
+    "take": "The price paid",
+    "return": "Going back to familiar territory",
+    "change": "How they have changed"
+  }},
+  "the_take": "The specific price paid -- what was lost or sacrificed"
+}}""",
+    },
+    "Save the Cat! Beat Sheet": {
+        "filter_tag": "save_the_cat",
+        "prompt_suffix": """Map the narrative to Blake Snyder's Save the Cat beat sheet. Focus on where the pacing deviates from the prescribed beat timing.
+
+Output as JSON:
+{{
+  "beats_present": ["List the Save the Cat beats that appear"],
+  "pacing_deviations": "Where and how does the pacing diverge from the expected beat sheet timing?"
+}}""",
+    },
+    "Propp's Morphology": {
+        "filter_tag": "propp",
+        "prompt_suffix": """Identify which of Propp's narrative functions (narratemes) appear in this story.
+
+Output as JSON:
+{{
+  "applicable_narratemes": ["List each Proppian function present, e.g. 'Absentation', 'Villainy', 'Departure', 'Struggle', 'Victory'"]
+}}""",
+    },
+    "Kishotenketsu": {
+        "filter_tag": "kishotenketsu",
+        "prompt_suffix": """Analyze how well the four-act Kishotenketsu structure applies to this narrative. This structure emphasizes a twist/shift (ten) rather than conflict-driven drama.
+
+Output as JSON:
+{{
+  "ki": "Introduction -- the initial situation and characters",
+  "sho": "Development -- deepening without introducing conflict",
+  "ten": "Twist -- the surprising shift or new perspective",
+  "ketsu": "Conclusion -- reconciliation of the twist with the established narrative",
+  "applicability": "How well does Kishotenketsu fit this narrative vs. Western conflict-driven models?"
+}}""",
+    },
+    "Protocol Fiction Mapping": {
+        "filter_tag": "protocol",
+        "prompt_suffix": """Analyze this narrative through the Protocol Fiction lens (Summer of Protocols). Identify the rules/protocols the narrative renders, how they fail, and what human insight emerges.
+
+Output as JSON:
+{{
+  "rule": "The protocol, rule, or system the narrative renders visible",
+  "failure_mode": "How the protocol fails or is subverted",
+  "human_insight": "The human truth revealed through the protocol's failure"
+}}""",
+    },
+    "Genette's Narrative Discourse": {
+        "filter_tag": "genette_narrative",
+        "prompt_suffix": """Analyze the narrative discourse using Genette's categories.
+
+Output as JSON:
+{{
+  "order": "How is story time arranged vs. discourse time? (analepsis, prolepsis, linear)",
+  "duration": "Pacing techniques: scene, summary, ellipsis, pause, stretch",
+  "focalization": "Who perceives? Zero focalization (omniscient), internal (character-bound), external (camera)"
+}}""",
+    },
+    "Levi-Strauss's Binary Oppositions": {
+        "filter_tag": "levi_strauss",
+        "prompt_suffix": """Identify the central binary oppositions that structure this narrative's meaning.
+
+Output as JSON:
+{{
+  "primary_binary": "The dominant opposition (e.g., nature/culture, individual/collective)",
+  "secondary_binary": "A supporting opposition that reinforces or complicates the primary",
+  "mediator": "The character, event, or concept that mediates or resolves the opposition"
+}}""",
+    },
+    "Cognitive Estrangement": {
+        "filter_tag": "estrangement",
+        "prompt_suffix": """Analyze through Suvin/Shklovsky's cognitive estrangement: how does the narrative make the familiar strange to produce new understanding?
+
+Output as JSON:
+{{
+  "familiar_concept": "The real-world concept or system being estranged",
+  "estranging_mechanism": "The speculative element (novum) that defamiliarizes it",
+  "cognitive_shift": "The new understanding or critical perspective produced"
+}}""",
+    },
+    "Bakhtin's Chronotope": {
+        "filter_tag": "bakhtin",
+        "prompt_suffix": """Analyze the chronotope -- the fusion of time and space that defines this narrative's world.
+
+Output as JSON:
+{{
+  "spatial_matrix": "The defining spatial logic (labyrinth, threshold, road, enclosed space, etc.)",
+  "temporal_flow": "How time operates (cyclical, linear, geological, subjective, etc.)",
+  "intersection": "Where and how space and time fuse to create the narrative's distinctive world-feeling"
+}}""",
+    },
+    "Aristotelian Poetics": {
+        "filter_tag": "aristotle",
+        "prompt_suffix": """Analyze through Aristotle's Poetics: identify the tragic elements.
+
+Output as JSON:
+{{
+  "hamartia": "The protagonist's tragic flaw or error of judgment",
+  "peripeteia": "The reversal of fortune -- the moment when things turn",
+  "anagnorisis": "The moment of critical recognition or discovery"
+}}""",
+    },
+    "Jungian Archetypal Analysis": {
+        "filter_tag": "jung",
+        "prompt_suffix": """Identify the Jungian archetypes present in the narrative.
+
+Output as JSON:
+{{
+  "persona": "The public mask or social role characters present",
+  "shadow": "The repressed, dark, or denied aspects",
+  "anima_animus": "The contrasexual inner figure -- the feminine in masculine or vice versa",
+  "trickster": "The agent of chaos, boundary-crossing, or transformation"
+}}""",
+    },
+    "Genette's Transtextuality": {
+        "filter_tag": "transtextuality",
+        "prompt_suffix": """Analyze the transtextual relationships -- how this text relates to other texts.
+
+Output as JSON:
+{{
+  "intertextuality": "Direct quotations, allusions, or references to other works",
+  "paratextuality": "How titles, epigraphs, prefaces, or cover art frame meaning",
+  "metatextuality": "How the text comments on or critiques other texts or its own genre"
+}}""",
+    },
 }
+
+
+async def synthesize_frameworks(full_jsonl, global_outline=""):
+    t0 = time.time()
+    print(f"\n--- Phase 3: Synthesizing {len(FRAMEWORK_SYNTHESIS_PROMPTS)} Frameworks ---")
+
+    # Extract dramatis personae from global outline for character grounding
+    outline_context = ""
+    if global_outline:
+        dp_match = re.search(r'(## DRAMATIS PERSONAE.*?)(?=\n## |\Z)', global_outline, re.DOTALL)
+        if dp_match:
+            outline_context = dp_match.group(1).strip()
+
+    async def synthesize_single(fw_name, fw_config):
+        fw_start = time.time()
+        print(f"  Synthesizing: {fw_name}...")
+
+        # Filter JSONL by framework signals if available
+        filtered_jsonl = full_jsonl
+        filter_tag = fw_config.get("filter_tag")
+        if filter_tag:
+            lines = [l for l in full_jsonl.split('\n')
+                     if f'"{filter_tag}:' in l.lower() or f"'{filter_tag}:" in l.lower()]
+            if len(lines) >= 3:
+                filtered_jsonl = "\n".join(lines)
+                print(f"    Filtered to {len(lines)} tagged events (tag: {filter_tag})")
+            else:
+                print(f"    Only {len(lines)} tagged events for {filter_tag}, using full JSONL")
+
+        character_ref = ""
+        if outline_context:
+            character_ref = f"""
+## CHARACTER REFERENCE
+{outline_context}
+
+Use the character reference above to ensure correct name-to-role attribution.
+
 """
+
+        prompt = f"""You are a Synthesis Sub-Agent specializing in {fw_name}.
+{character_ref}
+## STRUCTURAL EVENT TIMELINE
+{filtered_jsonl}
+
+Task:
+Analyze the timeline and output ONLY the {fw_name} analysis in valid JSON format.
+
+{fw_config['prompt_suffix']}"""
+
         res = await run_gemini_cli(prompt)
         fw_time = time.time() - fw_start
-        print(f"Completed: {fw} in {fw_time:.2f}s")
-        return f"### {fw}\n{res}\n"
+        print(f"  Completed: {fw_name} in {fw_time:.2f}s")
+        return f"### {fw_name}\n{res}\n"
 
-    tasks = [synthesize_single(fw) for fw in frameworks]
+    tasks = [synthesize_single(fw, cfg) for fw, cfg in FRAMEWORK_SYNTHESIS_PROMPTS.items()]
     results = await asyncio.gather(*tasks)
     t1 = time.time()
-    print(f"Phase 3 completed in {t1-t0:.2f}s")
+    print(f"Phase 3 completed in {t1-t0:.2f}s ({len(results)} frameworks)")
     return "\n".join(results)
 
 
@@ -370,8 +610,8 @@ async def main():
     all_lines = [l for l in full_jsonl.split("\n") if l.strip()]
     print(f"\nPhase 2 complete: {len(all_lines)} total events.")
 
-    # 4. Framework Synthesis
-    synthesis_result = await synthesize_frameworks(full_jsonl)
+    # 4. Framework Synthesis (with outline for character grounding)
+    synthesis_result = await synthesize_frameworks(full_jsonl, global_outline)
     final_output = full_jsonl + "\n\n=== SYNTHESIS ===\n" + synthesis_result
 
     with open(args.output_file, "w", encoding="utf-8") as f:
