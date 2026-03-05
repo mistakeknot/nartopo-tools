@@ -24,6 +24,7 @@ SCORE_METHODS = [
     "model_tiering_scores",
     "enriched_schema_scores",
     "adaptive_chunking_scores",
+    "improved_outline_scores",
 ]
 
 AXES = [
