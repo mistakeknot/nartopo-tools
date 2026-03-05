@@ -26,6 +26,7 @@ SCORE_METHODS = [
     "adaptive_chunking_scores",
     "improved_outline_scores",
     "combined_outline_adaptive_scores",
+    "dynamic_keywords_scores",
 ]
 
 AXES = [

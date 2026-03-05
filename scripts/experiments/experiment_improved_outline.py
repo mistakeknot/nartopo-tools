@@ -168,6 +168,61 @@ def format_snippets(snippets):
     return "\n\n---\n\n".join(parts)
 
 
+# ---------------------------------------------------------------------------
+# Dynamic keyword extraction from outline
+# ---------------------------------------------------------------------------
+
+KEYWORD_EXTRACTION_PROMPT = """Extract retrieval keywords from this novel outline for semantic search.
+
+{outline}
+
+Output a JSON array of 8-12 search queries, each 3-8 words. Include:
+- 2-3 queries with major character names + their key actions/relationships
+- 2-3 queries about central conflicts and plot turning points
+- 2-3 queries about thematic elements and narrative tension
+- 1-2 queries about the climax/resolution
+
+Return ONLY a JSON array of strings, no other text:
+["query 1", "query 2", ...]"""
+
+STATIC_KEYWORDS = [
+    "major plot progression action",
+    "character emotional shift dialogue",
+    "bureaucracy exposition history",
+    "systemic threat or conflict",
+]
+
+
+async def extract_dynamic_keywords(outline):
+    """Extract book-specific retrieval keywords from the structured outline."""
+    t0 = time.time()
+    print("\n--- Extracting dynamic keywords from outline ---")
+
+    prompt = KEYWORD_EXTRACTION_PROMPT.format(outline=outline)
+    result = await run_gemini_cli(prompt)
+
+    # Parse JSON array from response
+    keywords = None
+    for match in re.finditer(r'\[.*?\]', result, re.DOTALL):
+        try:
+            parsed = json.loads(match.group())
+            if isinstance(parsed, list) and all(isinstance(x, str) for x in parsed):
+                keywords = parsed
+                break
+        except json.JSONDecodeError:
+            continue
+
+    if not keywords:
+        print("  Warning: Could not parse dynamic keywords, falling back to static")
+        return STATIC_KEYWORDS
+
+    t1 = time.time()
+    print(f"  Extracted {len(keywords)} dynamic keywords in {t1 - t0:.2f}s:")
+    for kw in keywords:
+        print(f"    - {kw}")
+    return keywords
+
+
 IMPROVED_OUTLINE_PROMPT = """You are a master literary structuralist performing a fast-pass structural survey.
 I am giving you {n} evenly-spaced text samples labeled with position (0%=opening, 100%=final pages).
 
@@ -506,8 +561,13 @@ def extract_scores_json(text):
     return None
 
 
-def format_yaml_scores(scores, chunking="fixed"):
-    key = "combined_outline_adaptive_scores" if chunking == "adaptive" else "improved_outline_scores"
+def format_yaml_scores(scores, chunking="fixed", keywords="static"):
+    if keywords in ("dynamic", "combined"):
+        key = "dynamic_keywords_scores"
+    elif chunking == "adaptive":
+        key = "combined_outline_adaptive_scores"
+    else:
+        key = "improved_outline_scores"
     lines = [f"{key}:"]
     for axis in [
         "time_linearity",
@@ -563,6 +623,12 @@ async def main():
         help=f"Chars per snippet (default: {SNIPPET_SIZE})",
     )
     parser.add_argument(
+        "--keywords",
+        choices=["static", "dynamic", "combined"],
+        default="static",
+        help="Keyword strategy: static (4 hardcoded), dynamic (from outline), combined (both) (default: static)",
+    )
+    parser.add_argument(
         "--output-dir",
         type=str,
         default=None,
@@ -580,6 +646,7 @@ async def main():
     print(f"  Strategy: {args.strategy}")
     print(f"  Two-pass: {args.two_pass}")
     print(f"  Chunking: {args.chunking}")
+    print(f"  Keywords: {args.keywords}")
     print(f"  Snippets: {args.n_snippets} x {args.snippet_size} chars")
 
     start_time = time.time()
@@ -597,13 +664,6 @@ async def main():
         macro_chunks = [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
         chunk_labels = [f"fixed_{i+1}" for i in range(len(macro_chunks))]
         print(f"  Macro-chunks: {len(macro_chunks)} (fixed 150K)")
-
-    keywords = [
-        "major plot progression action",
-        "character emotional shift dialogue",
-        "bureaucracy exposition history",
-        "systemic threat or conflict",
-    ]
 
     # --- Phase 1: Improved Global Outline ---
     if args.two_pass:
@@ -625,6 +685,16 @@ async def main():
     with open(outline_path, "w", encoding="utf-8") as f:
         f.write(global_outline)
     print(f"  Outline saved to {outline_path}")
+
+    # --- Keyword selection ---
+    if args.keywords == "dynamic":
+        keywords = await extract_dynamic_keywords(global_outline)
+    elif args.keywords == "combined":
+        dynamic_kw = await extract_dynamic_keywords(global_outline)
+        keywords = STATIC_KEYWORDS + dynamic_kw
+        print(f"  Combined: {len(STATIC_KEYWORDS)} static + {len(dynamic_kw)} dynamic = {len(keywords)} keywords")
+    else:
+        keywords = STATIC_KEYWORDS
 
     # --- Phase 2: Parallel Fan-Out Chunk Extraction ---
     print(f"\n--- Phase 2: Parallel Fan-Out Chunk Extraction ({len(macro_chunks)} chunks, {args.chunking}) ---")
@@ -671,7 +741,7 @@ async def main():
     print(f"Results saved to {args.output_file}")
 
     if scores:
-        yaml_block = format_yaml_scores(scores, args.chunking)
+        yaml_block = format_yaml_scores(scores, args.chunking, args.keywords)
         print(f"\n--- YAML for data file injection ---")
         print(yaml_block)
         print(f"---")
