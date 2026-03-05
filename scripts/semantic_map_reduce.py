@@ -23,7 +23,7 @@ N_SNIPPETS = 30
 MAX_SNIPPETS_PER_CHUNK = 12
 RETRIEVAL_TOP_K = 2
 MIN_EVENTS_PER_CHUNK = 1
-MIN_TAGGED_EVENTS = 3
+MIN_TAGGED_EVENTS = 2
 MAX_OUTLINE_CONTEXT_CHARS = 5_000
 
 EMBED_CONCURRENCY = int(os.environ.get("NTSMR_EMBED_CONCURRENCY", "8"))
@@ -79,7 +79,7 @@ FRAMEWORK_SYNTHESIS_PROMPTS = {
     },
     "Quadrant Scores": {
         "filter_tag": None,
-        "prompt_suffix": """Output exactly 6 floats between 0.0 and 1.0 for these metrics based on the timeline's pacing, conflict types, and plot structure:\n- time_linearity: 0.0=Linear, 1.0=Fractured\n- pacing_velocity: 0.0=Action-Driven, 1.0=Observational\n- threat_scale: 0.0=Individual, 1.0=Systemic\n- protagonist_fate: 0.0=Victory, 1.0=Assimilation\n- conflict_style: 0.0=Western Combat, 1.0=Kishotenketsu\n- price_type: 0.0=Physical, 1.0=Ideological\n\nThe analysis object must be:\n{\n  \"time_linearity\": 0.0,\n  \"pacing_velocity\": 0.0,\n  \"threat_scale\": 0.0,\n  \"protagonist_fate\": 0.0,\n  \"conflict_style\": 0.0,\n  \"price_type\": 0.0\n}""",
+        "prompt_suffix": """Output exactly 6 floats between 0.0 and 1.0 for these metrics based on the timeline's pacing, conflict types, and plot structure:\n- time_linearity: 0.0=Linear, 1.0=Fractured\n- pacing_velocity: 0.0=Action-Driven, 1.0=Observational\n- threat_scale: 0.0=Individual, 1.0=Systemic\n- protagonist_fate: 0.0=Victory, 1.0=Assimilation\n- conflict_style: 0.0=Western Combat, 1.0=Kishotenketsu\n- price_type: 0.0=Physical, 1.0=Ideological\n\nScoring guidance:\n- Score the dominant narrative logic of the whole work, not just the loudest climax.\n- For time_linearity, documentary flashbacks, embedded records, recurring memory loops, and frame narration that repeatedly interrupts the forward plot should push upward even if the surface chronology is mostly sequential.\n- For pacing_velocity, sustained observation, reflection, investigation, and environmental interpretation should push upward even if a few scenes are violent.\n- For threat_scale, institutions, class systems, biopolitical sorting, civilizational infrastructures, and other social logics count as systemic even when the immediate scene is intimate.\n- For conflict_style, ask whether meaning is driven mainly by combat/opposition or by revelation, juxtaposition, atmosphere, and perspective shift.\n- Isolated violent climaxes should not outweigh a largely contemplative or exploratory structure.\n- For price_type, costs paid in identity, autonomy, status, belief, memory, relational bonds, or moral worldview should push toward ideological even when bodies are also at risk.\n\nThe analysis object must be:\n{\n  \"time_linearity\": 0.0,\n  \"pacing_velocity\": 0.0,\n  \"threat_scale\": 0.0,\n  \"protagonist_fate\": 0.0,\n  \"conflict_style\": 0.0,\n  \"price_type\": 0.0\n}""",
     },
     "The Freytag Pyramid": {
         "filter_tag": "freytag",
@@ -304,6 +304,18 @@ def ordered_dedupe(items: list[str]) -> list[str]:
         seen.add(item)
         ordered.append(item)
     return ordered
+
+
+def to_json_safe(value: Any) -> Any:
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {key: to_json_safe(inner) for key, inner in value.items()}
+    if isinstance(value, list):
+        return [to_json_safe(inner) for inner in value]
+    if isinstance(value, tuple):
+        return [to_json_safe(inner) for inner in value]
+    return value
 
 
 def combine_keywords(dynamic_keywords: list[str], static_keywords: list[str] | None = None) -> list[str]:
@@ -663,9 +675,10 @@ def select_snippets_for_chunk(
         faiss.normalize_L2(q_vec)
         scores, indices = index.search(q_vec, RETRIEVAL_TOP_K)
         for score, idx in zip(scores[0], indices[0]):
-            if idx < 0 or idx >= len(valid_micro_chunks):
+            idx_int = int(idx)
+            if idx_int < 0 or idx_int >= len(valid_micro_chunks):
                 continue
-            best_by_index[idx] = max(float(score), best_by_index.get(idx, float("-inf")))
+            best_by_index[idx_int] = max(float(score), best_by_index.get(idx_int, float("-inf")))
 
     selected_indices = sorted(best_by_index, key=lambda idx: (-best_by_index[idx], idx))[:MAX_SNIPPETS_PER_CHUNK]
     selected_indices.sort()
@@ -841,7 +854,7 @@ def build_report(
         }
         for framework_name, payload in synthesis_payload.items()
     }
-    return {
+    return to_json_safe({
         "ntsmr_version": NTSMR_VERSION,
         "book_file": book_file,
         "artifacts": artifact_paths.__dict__,
@@ -863,7 +876,7 @@ def build_report(
             for chunk in chunk_reports
         ],
         "elapsed_seconds": round(elapsed_seconds, 2),
-    }
+    })
 
 
 async def main():
