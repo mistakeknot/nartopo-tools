@@ -10,10 +10,9 @@ import yaml
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
-BASELINE = "quadrant_scores"
+BASELINE = "ntsmr_scores"
 
 SCORE_METHODS = [
-    "ntsmr_scores",
     "llm_memory_quadrant_scores",
     "minilm_rag_scores",
     "nomic_rag_scores",
@@ -23,6 +22,7 @@ SCORE_METHODS = [
     "grand_unification_scores",
     "sliding_context_scores",
     "model_tiering_scores",
+    "enriched_schema_scores",
 ]
 
 AXES = [
