@@ -14,8 +14,8 @@ NTSMR_VERSION = "2.1"
 def get_nomic_embedding_sync(text):
     payload = {"model": "nomic-embed-text", "prompt": text}
 
-    # Try the remote RTX 4090 via Tailscale first, fallback to localhost
-    ollama_host = os.environ.get("OLLAMA_HOST", "http://100.107.177.128:11434")
+    # Always use the remote RTX 4090 via Tailscale
+    ollama_host = "http://100.107.177.128:11434"
 
     req = urllib.request.Request(
         f"{ollama_host}/api/embeddings",
@@ -26,18 +26,7 @@ def get_nomic_embedding_sync(text):
         response = urllib.request.urlopen(req, timeout=10)
         return json.loads(response.read())["embedding"]
     except Exception as e:
-        # If remote fails, fallback to local
-        if "100.107.177.128" in ollama_host:
-            req = urllib.request.Request(
-                "http://localhost:11434/api/embeddings",
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"}
-            )
-            try:
-                response = urllib.request.urlopen(req, timeout=10)
-                return json.loads(response.read())["embedding"]
-            except Exception as e2:
-                pass
+        print(f"Error getting embedding from remote RTX 4090: {e}")
         return []
 
 async def get_nomic_embedding(text):
