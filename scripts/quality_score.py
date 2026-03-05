@@ -25,6 +25,7 @@ SCORE_METHODS = [
     "enriched_schema_scores",
     "adaptive_chunking_scores",
     "improved_outline_scores",
+    "combined_outline_adaptive_scores",
 ]
 
 AXES = [

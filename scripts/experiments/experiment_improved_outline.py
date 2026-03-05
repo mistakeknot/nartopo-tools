@@ -31,6 +31,8 @@ import argparse
 import time
 import re
 
+from experiment_adaptive_chunking import adaptive_chunk
+
 
 # ---------------------------------------------------------------------------
 # Embedding helpers (shared with other experiments)
@@ -353,12 +355,11 @@ Be concrete. Use actual names. Correct any errors from the rough outline using t
 # Phase 2: Parallel chunk extraction (IDENTICAL to production)
 # ---------------------------------------------------------------------------
 
-async def process_chunk(chunk_idx, micro_chunks, keywords, global_outline, book_file):
+async def process_chunk(chunk_idx, micro_chunks, keywords, global_outline, cache_base):
     """Process a single macro-chunk. Identical to production semantic_map_reduce.py."""
     chunk_start = time.time()
     print(f"[{chunk_idx}] Generating or loading embeddings...")
 
-    cache_base = f"{book_file}_chunk{chunk_idx}"
     faiss_path = f"{cache_base}.faiss"
     chunks_path = f"{cache_base}_chunks.json"
 
@@ -505,8 +506,9 @@ def extract_scores_json(text):
     return None
 
 
-def format_yaml_scores(scores):
-    lines = ["improved_outline_scores:"]
+def format_yaml_scores(scores, chunking="fixed"):
+    key = "combined_outline_adaptive_scores" if chunking == "adaptive" else "improved_outline_scores"
+    lines = [f"{key}:"]
     for axis in [
         "time_linearity",
         "pacing_velocity",
@@ -543,6 +545,12 @@ async def main():
         help="Enable two-pass FAISS gap-filling",
     )
     parser.add_argument(
+        "--chunking",
+        choices=["fixed", "adaptive"],
+        default="fixed",
+        help="Macro-chunking strategy: fixed 150K or adaptive structural boundaries (default: fixed)",
+    )
+    parser.add_argument(
         "--n-snippets",
         type=int,
         default=N_SNIPPETS,
@@ -571,14 +579,24 @@ async def main():
     print(f"  Total chars: {len(text):,}")
     print(f"  Strategy: {args.strategy}")
     print(f"  Two-pass: {args.two_pass}")
+    print(f"  Chunking: {args.chunking}")
     print(f"  Snippets: {args.n_snippets} x {args.snippet_size} chars")
 
     start_time = time.time()
 
-    # Fixed 150K macro-chunks (identical to production) to isolate the outline variable
-    chunk_size = 150_000
-    macro_chunks = [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
-    print(f"  Macro-chunks: {len(macro_chunks)} (fixed 150K)")
+    if args.chunking == "adaptive":
+        chunks_with_labels = adaptive_chunk(text)
+        macro_chunks = [chunk for chunk, _ in chunks_with_labels]
+        chunk_labels = [label for _, label in chunks_with_labels]
+        print(f"  Macro-chunks: {len(macro_chunks)} (adaptive, boundaries: {len(chunks_with_labels)})")
+        for i, (chunk, label) in enumerate(chunks_with_labels):
+            preview = chunk[:60].replace("\n", " ").strip()
+            print(f"    [{label}] {len(chunk):>7,} chars | {preview}...")
+    else:
+        chunk_size = 150_000
+        macro_chunks = [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
+        chunk_labels = [f"fixed_{i+1}" for i in range(len(macro_chunks))]
+        print(f"  Macro-chunks: {len(macro_chunks)} (fixed 150K)")
 
     keywords = [
         "major plot progression action",
@@ -608,15 +626,19 @@ async def main():
         f.write(global_outline)
     print(f"  Outline saved to {outline_path}")
 
-    # --- Phase 2: Parallel Fan-Out Chunk Extraction (IDENTICAL to production) ---
-    print(f"\n--- Phase 2: Parallel Fan-Out Chunk Extraction ({len(macro_chunks)} chunks) ---")
+    # --- Phase 2: Parallel Fan-Out Chunk Extraction ---
+    print(f"\n--- Phase 2: Parallel Fan-Out Chunk Extraction ({len(macro_chunks)} chunks, {args.chunking}) ---")
+
+    # Use different cache prefix for adaptive to avoid collisions with fixed-chunk caches
+    cache_prefix = "adaptive_chunk" if args.chunking == "adaptive" else "chunk"
 
     tasks = []
     for chunk_idx, chunk_text in enumerate(macro_chunks):
         micro_chunks = [chunk_text[i : i + 4000] for i in range(0, len(chunk_text), 4000)]
+        cache_base = f"{args.book_file}_{cache_prefix}{chunk_idx + 1}"
         tasks.append(
             process_chunk(
-                chunk_idx + 1, micro_chunks, keywords, global_outline, args.book_file,
+                chunk_idx + 1, micro_chunks, keywords, global_outline, cache_base,
             )
         )
 
@@ -625,10 +647,10 @@ async def main():
     # Save intermediates
     for chunk_idx, result in enumerate(chunk_results):
         if result.strip():
-            intermediate_path = os.path.join(output_dir, f"chunk_{chunk_idx + 1}.jsonl")
+            intermediate_path = os.path.join(output_dir, f"chunk_{chunk_labels[chunk_idx]}.jsonl")
             with open(intermediate_path, "w", encoding="utf-8") as f:
                 f.write(result)
-            print(f"[{chunk_idx + 1}] Saved intermediate: {intermediate_path}")
+            print(f"[{chunk_labels[chunk_idx]}] Saved intermediate: {intermediate_path}")
 
     full_jsonl = "\n".join(chunk_results)
     all_lines = [l for l in full_jsonl.split("\n") if l.strip()]
@@ -649,7 +671,7 @@ async def main():
     print(f"Results saved to {args.output_file}")
 
     if scores:
-        yaml_block = format_yaml_scores(scores)
+        yaml_block = format_yaml_scores(scores, args.chunking)
         print(f"\n--- YAML for data file injection ---")
         print(yaml_block)
         print(f"---")
