@@ -2,6 +2,7 @@
 import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
+import matter from "gray-matter";
 
 // --- Schema ---
 
@@ -79,8 +80,70 @@ const AddAnalysisSchema = z.object({
       three_act_structure: z.object({
         plot_points: z.string(),
       }),
+      levi_strauss: z.object({
+        primary_binary: z.string(),
+        secondary_binary: z.string(),
+        mediator: z.string(),
+      }),
+      cognitive_estrangement: z.object({
+        familiar_concept: z.string(),
+        estranging_mechanism: z.string(),
+        cognitive_shift: z.string(),
+      }),
+      bakhtins_chronotope: z.object({
+        spatial_matrix: z.string(),
+        temporal_flow: z.string(),
+        point_of_intersection: z.string(),
+      }),
+      aristotelian_poetics: z.object({
+        hamartia: z.string(),
+        peripeteia: z.string(),
+        anagnorisis: z.string(),
+      }),
+      jungian_archetypal: z.object({
+        persona: z.string(),
+        shadow: z.string(),
+        anima_animus: z.string(),
+        trickster: z.string(),
+      }),
+      genettes_transtextuality: z.object({
+        intertextuality: z.string(),
+        paratextuality: z.string(),
+        metatextuality: z.string(),
+      }),
     })
-    .describe("Content for the markdown headers (11 frameworks)."),
+    .describe("Content for the markdown headers (17 frameworks)."),
+});
+
+const AnalysisMetadataSchema = z.object({
+  generated_by: z.string(),
+  date: z.string(),
+  validation_status: z.string(),
+});
+
+const WrittenFileSchema = z.object({
+  title: z.string(),
+  author: z.string(),
+  year: z.number(),
+  frameworks_mapped: z.array(z.string()).min(1),
+  todorov_stages: z.object({
+    equilibrium: z.string(),
+    disruption: z.string(),
+    recognition: z.string(),
+    repair: z.string(),
+    new_equilibrium: z.string(),
+  }),
+  quadrant_scores: ScoresSchema,
+  llm_memory_quadrant_scores: ScoresSchema.optional(),
+  minilm_rag_scores: ScoresSchema.optional(),
+  nomic_rag_scores: ScoresSchema.optional(),
+  hybrid_index_scores: ScoresSchema.optional(),
+  sliding_window_scores: ScoresSchema.optional(),
+  ntsmr_scores: ScoresSchema.optional(),
+  medium: z.string(),
+  genre_tags: z.array(z.string()),
+  tropes: z.array(z.string()),
+  analysis_metadata: AnalysisMetadataSchema,
 });
 
 // --- Helpers ---
@@ -131,7 +194,7 @@ function buildFile(data: z.infer<typeof AddAnalysisSchema>): string {
 title: "${escapeYaml(data.title)}"
 author: "${escapeYaml(data.author)}"
 year: ${data.year}
-frameworks_mapped: ["Protocol Fiction Mapping", "Actantial Model", "Todorov's Equilibrium", "The Freytag Pyramid", "Propp's Morphology", "Genette's Narrative", "The Monomyth", "Dan Harmon", "Save the Cat", "Kishōtenketsu", "The Three-Act Structure"]
+frameworks_mapped: ["Protocol Fiction Mapping", "Actantial Model", "Todorov's Equilibrium", "The Freytag Pyramid", "Propp's Morphology", "Genette's Narrative", "The Monomyth", "Dan Harmon", "Save the Cat", "Kishōtenketsu", "The Three-Act Structure", "Lévi-Strauss's Binary Oppositions", "Cognitive Estrangement", "Bakhtin's Chronotope", "Aristotelian Poetics", "Jungian Archetypal Analysis", "Genette's Transtextuality"]
 todorov_stages:
   equilibrium: "${escapeYaml(data.todorov_stages.equilibrium)}"
   disruption: "${escapeYaml(data.todorov_stages.disruption)}"
@@ -209,40 +272,67 @@ analysis_metadata:
 - **Applicability:** ${data.frameworks.kishotenketsu.applicability}
 ${kishotenketsuDetails ? kishotenketsuDetails + "\n" : ""}
 ## 11. The Three-Act Structure
-- **Plot Points:** ${data.frameworks.three_act_structure.plot_points}`;
+- **Plot Points:** ${data.frameworks.three_act_structure.plot_points}
+
+## 12. Lévi-Strauss's Binary Oppositions
+- **Primary Binary:** ${data.frameworks.levi_strauss.primary_binary}
+- **Secondary Binary:** ${data.frameworks.levi_strauss.secondary_binary}
+- **The Mediator:** ${data.frameworks.levi_strauss.mediator}
+
+## 13. Cognitive Estrangement (Suvin / Shklovsky)
+- **The Familiar Concept:** ${data.frameworks.cognitive_estrangement.familiar_concept}
+- **The Estranging Mechanism:** ${data.frameworks.cognitive_estrangement.estranging_mechanism}
+- **The Cognitive Shift:** ${data.frameworks.cognitive_estrangement.cognitive_shift}
+
+## 14. Bakhtin's Chronotope
+- **The Spatial Matrix:** ${data.frameworks.bakhtins_chronotope.spatial_matrix}
+- **The Temporal Flow:** ${data.frameworks.bakhtins_chronotope.temporal_flow}
+- **The Point of Intersection:** ${data.frameworks.bakhtins_chronotope.point_of_intersection}
+
+## 15. Aristotelian Poetics
+- **Hamartia:** ${data.frameworks.aristotelian_poetics.hamartia}
+- **Peripeteia:** ${data.frameworks.aristotelian_poetics.peripeteia}
+- **Anagnorisis:** ${data.frameworks.aristotelian_poetics.anagnorisis}
+
+## 16. Jungian Archetypal Analysis
+- **The Persona:** ${data.frameworks.jungian_archetypal.persona}
+- **The Shadow:** ${data.frameworks.jungian_archetypal.shadow}
+- **The Anima/Animus:** ${data.frameworks.jungian_archetypal.anima_animus}
+- **The Trickster:** ${data.frameworks.jungian_archetypal.trickster}
+
+## 17. Genette's Transtextuality
+- **Intertextuality:** ${data.frameworks.genettes_transtextuality.intertextuality}
+- **Paratextuality:** ${data.frameworks.genettes_transtextuality.paratextuality}
+- **Metatextuality:** ${data.frameworks.genettes_transtextuality.metatextuality}`;
 
   return yaml + "\n" + markdown.trim() + "\n";
 }
 
 // --- Validation ---
 
-const REQUIRED_KEYS = [
-  "title",
-  "author",
-  "year",
-  "quadrant_scores",
-  "frameworks_mapped",
-  "medium",
-  "genre_tags",
-];
+export function validateWrittenFileContent(written: string) {
+  const parsed = matter(written);
+  const result = WrittenFileSchema.safeParse(parsed.data);
+  if (!result.success) {
+    throw new Error(
+      `Validation failed: ${result.error.issues
+        .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+        .join("; ")}`,
+    );
+  }
+  if (!parsed.content.includes("# Structural Analysis")) {
+    throw new Error("Validation failed: markdown body missing Structural Analysis heading.");
+  }
+  return result.data;
+}
 
 function validateWrittenFile(filePath: string): void {
   const written = fs.readFileSync(filePath, "utf-8");
-  const fmMatch = written.match(/^---\n([\s\S]*?)\n---/);
-  if (!fmMatch) {
+  try {
+    validateWrittenFileContent(written);
+  } catch (error) {
     fs.unlinkSync(filePath);
-    throw new Error(
-      "Validation failed: written file has no valid YAML frontmatter. File deleted.",
-    );
-  }
-
-  const rawYaml = fmMatch[1];
-  const missingKeys = REQUIRED_KEYS.filter((k) => !rawYaml.includes(`${k}:`));
-  if (missingKeys.length > 0) {
-    fs.unlinkSync(filePath);
-    throw new Error(
-      `Validation failed: missing keys [${missingKeys.join(", ")}]. File deleted.`,
-    );
+    throw error;
   }
 }
 
@@ -301,7 +391,9 @@ async function main() {
   console.log(`data/${slug}.md`);
 }
 
-main().catch((err) => {
-  console.error("Error:", err.message);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error("Error:", err.message);
+    process.exit(1);
+  });
+}

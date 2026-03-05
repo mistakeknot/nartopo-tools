@@ -11,7 +11,7 @@ If a book text is too large to fit effectively into a single context window or y
 2. Spawns parallel, headless `gemini -y -p` CLI sub-agents for each chunk.
 3. Each sub-agent extracts dense structural data, plot events, pacing metrics, and character shifts strictly from their assigned local text fragment.
 4. Waits for all sub-agents to complete and synthesizes their parallel findings into a single `findings.txt` log.
-5. The primary agent then reads the synthesized log to generate the final 11-framework JSON payload.
+5. The primary agent then reads the synthesized log to generate the final 17-framework JSON payload plus quadrant scores.
 
 ## Next Step
-Once the `findings.txt` log is generated and read by the primary agent, proceed to [MCP Injection](03-mcp-injection.md).
+Once the `findings.txt` log is generated and read by the primary agent, proceed to [Writing the Analysis via CLI](03-analysis-writing.md).
