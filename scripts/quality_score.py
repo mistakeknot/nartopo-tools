@@ -27,6 +27,7 @@ SCORE_METHODS = [
     "improved_outline_scores",
     "combined_outline_adaptive_scores",
     "dynamic_keywords_scores",
+    "framework_agents_scores",
 ]
 
 AXES = [
