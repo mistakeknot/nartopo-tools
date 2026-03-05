@@ -9,6 +9,8 @@ import argparse
 import time
 import re
 
+NTSMR_VERSION = "2.1"
+
 def get_nomic_embedding_sync(text):
     payload = {"model": "nomic-embed-text", "prompt": text}
 
