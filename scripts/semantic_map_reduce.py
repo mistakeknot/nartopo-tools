@@ -559,7 +559,13 @@ Analyze the timeline and output ONLY the {fw_name} analysis in valid JSON format
         print(f"  Completed: {fw_name} in {fw_time:.2f}s")
         return f"### {fw_name}\n{res}\n"
 
-    tasks = [synthesize_single(fw, cfg) for fw, cfg in FRAMEWORK_SYNTHESIS_PROMPTS.items()]
+    # Throttle concurrency to prevent Node.js startup from pegging CPU
+    fw_sem = asyncio.Semaphore(2)
+    async def bound_synthesize(fw_name, cfg):
+        async with fw_sem:
+            return await synthesize_single(fw_name, cfg)
+
+    tasks = [bound_synthesize(fw, cfg) for fw, cfg in FRAMEWORK_SYNTHESIS_PROMPTS.items()]
     results = await asyncio.gather(*tasks)
     t1 = time.time()
     print(f"Phase 3 completed in {t1-t0:.2f}s ({len(results)} frameworks)")
@@ -591,10 +597,17 @@ async def main():
 
     # 3. Parallel Fan-Out Chunk Extraction
     print(f"\n--- Phase 2: Parallel Fan-Out Chunk Extraction ({len(macro_chunks)} chunks) ---")
+    
+    # Throttle concurrency to prevent Node.js startup from pegging CPU
+    chunk_sem = asyncio.Semaphore(2)
+    async def bound_process_chunk(chunk_idx, micro_chunks, keywords, global_outline, book_file):
+        async with chunk_sem:
+            return await process_chunk(chunk_idx, micro_chunks, keywords, global_outline, book_file)
+
     tasks = []
     for chunk_idx, macro_chunk in enumerate(macro_chunks):
         micro_chunks = [macro_chunk[i:i+4000] for i in range(0, len(macro_chunk), 4000)]
-        tasks.append(process_chunk(chunk_idx + 1, micro_chunks, keywords, global_outline, args.book_file))
+        tasks.append(bound_process_chunk(chunk_idx + 1, micro_chunks, keywords, global_outline, args.book_file))
 
     chunk_results = await asyncio.gather(*tasks)
     full_jsonl = "\n".join(chunk_results)
