@@ -23,8 +23,12 @@ DEFAULT_GEMINI_MODEL_LABEL = os.environ.get("NTSMR_GEMINI_MODEL_LABEL", "gemini-
 DEFAULT_LLM_BACKEND = os.environ.get("NTSMR_LLM_BACKEND", "gemini")
 DEFAULT_CODEX_MODEL = os.environ.get("NTSMR_CODEX_MODEL", "gpt-5.4")
 DEFAULT_CODEX_REASONING_EFFORT = os.environ.get("NTSMR_CODEX_REASONING_EFFORT")
-DEFAULT_CLAUDE_MODEL = os.environ.get("NTSMR_CLAUDE_MODEL", "sonnet")
+DEFAULT_CLAUDE_MODEL = os.environ.get("NTSMR_CLAUDE_MODEL", "claude-sonnet-4-6")
 DEFAULT_CLAUDE_REASONING_EFFORT = os.environ.get("NTSMR_CLAUDE_REASONING_EFFORT")
+CLAUDE_MODEL_ALIASES = {
+    "sonnet": "claude-sonnet-4-6",
+    "opus": "claude-opus-4-6",
+}
 SUPPORTED_LLM_BACKENDS = {"gemini", "codex-exec", "claude"}
 SUPPORTED_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 CLAUDE_REASONING_EFFORTS = {"low", "medium", "high"}
@@ -429,7 +433,8 @@ def build_llm_config(
         if normalized_reasoning:
             raise ValueError("Gemini backend does not support reasoning effort overrides")
     elif normalized_backend == "claude":
-        normalized_model = (model or DEFAULT_CLAUDE_MODEL).strip()
+        raw_model = (model or DEFAULT_CLAUDE_MODEL).strip()
+        normalized_model = CLAUDE_MODEL_ALIASES.get(raw_model, raw_model)
         normalized_reasoning = normalized_reasoning or DEFAULT_CLAUDE_REASONING_EFFORT
         if not normalized_reasoning:
             raise ValueError("Claude backend requires a reasoning effort")
