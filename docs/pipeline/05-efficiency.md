@@ -1,12 +1,12 @@
-# 5. Pipeline Efficiency & NTSMR 2.2
+# 5. Pipeline Efficiency & NTSMR 2.3
 
 For accurate Nartopo analysis on large texts, you must balance context limits with structural fidelity.
 
 Our research (see `../research/token-efficiency-experiments.md`) demonstrated that simple RAG extraction destroys the ability to measure pacing, while brute-forcing the entire text is computationally and financially expensive.
 
-To achieve optimal token-efficiency without sacrificing structural accuracy, use the **NTSMR 2.2 (Narrative Topology Semantic Map Reduce)** methodology.
+To achieve optimal token-efficiency without sacrificing structural accuracy, use the **NTSMR 2.3 (Narrative Topology Semantic Map Reduce)** methodology.
 
-## The NTSMR 2.2 Pipeline
+## The NTSMR 2.3 Pipeline
 
 This is a **Hybrid Parallel Architecture** combining:
 1. **Embedding Caching:** Generates and caches `nomic-embed-text` FAISS micro-indexes locally per chunk, making subsequent runs instantaneous.

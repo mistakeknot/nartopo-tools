@@ -14,7 +14,7 @@ from typing import Any
 import faiss
 import numpy as np
 
-NTSMR_VERSION = "2.2"
+NTSMR_VERSION = "2.3"
 
 MACRO_CHUNK_SIZE = 150_000
 MICRO_CHUNK_SIZE = 4_000
