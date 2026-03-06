@@ -11,4 +11,4 @@ Please proceed through the steps sequentially:
 4. [Verification and Deployment](04-deployment.md)
 
 ---
-*For optimizing context usage on massive texts, see [Pipeline Efficiency & Semantic Map-Reduce](05-efficiency.md). The production pipeline emits strict `events.jsonl`, `synthesis.json`, and `report.json` artifacts for downstream validation and ingestion.*
+*For optimizing context usage on massive texts, see [Pipeline Efficiency & Semantic Map-Reduce](05-efficiency.md). The production pipeline emits reusable `outline.json`, `snippets.jsonl`, `characters.jsonl`, `dialogue.jsonl`, `settings.jsonl`, `events.jsonl`, `synthesis.json`, and `report.json` artifacts for downstream validation and post-analysis.*

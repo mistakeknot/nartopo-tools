@@ -15,6 +15,7 @@ import faiss
 import numpy as np
 
 NTSMR_VERSION = "2.3"
+CACHE_SCHEMA_VERSION = "substrate-v1"
 
 MACRO_CHUNK_SIZE = 150_000
 MICRO_CHUNK_SIZE = 4_000
@@ -283,6 +284,54 @@ Output a JSON array of 8-12 search queries, each 3-8 words. Include:
 Return ONLY a JSON array of strings, no other text:
 [\"query 1\", \"query 2\", ...]"""
 
+SUBSTRATE_EXTRACTION_PROMPT = """You are a narrative substrate extraction sub-agent analyzing {chunk_id}.
+
+Here is the GLOBAL OUTLINE CONTEXT of the novel:
+{outline_context}
+
+Here are retrieved snippets from your specific chunk. Each snippet has a stable snippet ID:
+{snippets_text}
+
+Task:
+Extract reusable narrative substrate records grounded strictly in these snippets and output a single JSON object with exactly these keys:
+{{
+  "characters": [
+    {{
+      "snippet_ids": ["{chunk_id}-s1"],
+      "name": "Character name",
+      "aliases": ["Alias 1"],
+      "role": "Narrative or social role",
+      "summary": "Brief grounded description"
+    }}
+  ],
+  "dialogue_turns": [
+    {{
+      "snippet_ids": ["{chunk_id}-s2"],
+      "speaker": "Speaker name or group",
+      "addressee": "Addressee name, group, or unknown",
+      "speech_act": "command|confession|debate|exposition|revelation|request|threat|warning|other",
+      "summary": "Brief grounded summary of what is said or performed through speech"
+    }}
+  ],
+  "settings": [
+    {{
+      "snippet_ids": ["{chunk_id}-s3"],
+      "location": "Specific place or locale",
+      "time_marker": "When this setting is situated in the narrative",
+      "social_context": "Institutional, social, or environmental context",
+      "summary": "Brief grounded description of the setting"
+    }}
+  ]
+}}
+
+Rules:
+- Use only the provided snippet_ids.
+- Use empty arrays when nothing is grounded strongly enough.
+- Do not invent names, locations, or speech turns absent from the snippets.
+- aliases may be an empty array.
+- Output JSON only. No markdown. No prose.
+"""
+
 EMBED_SEMAPHORE = asyncio.Semaphore(EMBED_CONCURRENCY)
 CHUNK_SEMAPHORE = asyncio.Semaphore(CHUNK_CONCURRENCY)
 SYNTHESIS_SEMAPHORE = asyncio.Semaphore(SYNTHESIS_CONCURRENCY)
@@ -293,6 +342,11 @@ class ArtifactPaths:
     events_path: str
     synthesis_path: str
     report_path: str
+    outline_path: str
+    snippets_path: str
+    characters_path: str
+    dialogue_path: str
+    settings_path: str
 
 
 def ordered_dedupe(items: list[str]) -> list[str]:
@@ -335,6 +389,11 @@ def resolve_artifact_paths(output_file: str) -> ArtifactPaths:
         events_path=events_path,
         synthesis_path=base + ".synthesis.json",
         report_path=base + ".report.json",
+        outline_path=base + ".outline.json",
+        snippets_path=base + ".snippets.jsonl",
+        characters_path=base + ".characters.jsonl",
+        dialogue_path=base + ".dialogue.jsonl",
+        settings_path=base + ".settings.jsonl",
     )
 
 
@@ -354,6 +413,13 @@ def select_snippets_stratified(text: str, n_snippets: int = N_SNIPPETS, snippet_
     return snippets
 
 
+def build_outline_samples(text: str, n_snippets: int = N_SNIPPETS, snippet_size: int = SNIPPET_SIZE) -> list[dict[str, Any]]:
+    return [
+        {"position_percent": round(position, 2), "text": snippet}
+        for position, snippet in select_snippets_stratified(text, n_snippets=n_snippets, snippet_size=snippet_size)
+    ]
+
+
 def build_outline_context(global_outline: str, max_chars: int = MAX_OUTLINE_CONTEXT_CHARS) -> str:
     sections = []
     for heading in ["## DRAMATIS PERSONAE", "## NARRATIVE STRUCTURE", "## PLOT OUTLINE"]:
@@ -362,6 +428,21 @@ def build_outline_context(global_outline: str, max_chars: int = MAX_OUTLINE_CONT
             sections.append(match.group(1).strip())
     context = "\n\n".join(sections).strip() or global_outline.strip()
     return context[:max_chars]
+
+
+def build_micro_chunk_records(text: str, start_char: int = 0) -> list[dict[str, Any]]:
+    records = []
+    for source_index, chunk_start in enumerate(range(0, len(text), MICRO_CHUNK_SIZE)):
+        chunk_text = text[chunk_start : chunk_start + MICRO_CHUNK_SIZE]
+        records.append(
+            {
+                "source_index": source_index,
+                "start_char": start_char + chunk_start,
+                "end_char": start_char + chunk_start + len(chunk_text),
+                "text": chunk_text,
+            }
+        )
+    return records
 
 
 def normalize_signal(signal: str) -> str:
@@ -373,6 +454,38 @@ def validate_signal(signal: str) -> str:
     if normalized not in ALLOWED_SIGNALS:
         raise ValueError(f"Unknown framework signal: {signal}")
     return normalized
+
+
+def require_non_empty_string(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} must be a non-empty string")
+    return value.strip()
+
+
+def validate_snippet_ids(snippet_ids: Any, allowed_snippet_ids: set[str]) -> list[str]:
+    if not isinstance(snippet_ids, list) or not snippet_ids:
+        raise ValueError("Record missing snippet_ids")
+    normalized = ordered_dedupe(
+        [snippet_id.strip() for snippet_id in snippet_ids if isinstance(snippet_id, str) and snippet_id.strip()]
+    )
+    if not normalized:
+        raise ValueError("Record missing snippet_ids")
+    if not set(normalized).issubset(allowed_snippet_ids):
+        raise ValueError("Record references unknown snippet_ids")
+    return normalized
+
+
+def validate_optional_aliases(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("aliases must be a list")
+    normalized = []
+    for alias in value:
+        if not isinstance(alias, str) or not alias.strip():
+            raise ValueError("aliases must contain only non-empty strings")
+        normalized.append(alias.strip())
+    return ordered_dedupe(normalized)
 
 
 def validate_event(event: dict[str, Any], allowed_snippet_ids: set[str]) -> dict[str, Any]:
@@ -387,14 +500,10 @@ def validate_event(event: dict[str, Any], allowed_snippet_ids: set[str]) -> dict
         raise ValueError("Event missing event_id")
     if not isinstance(chunk_id, str) or not chunk_id.strip():
         raise ValueError("Event missing chunk_id")
-    if not isinstance(snippet_ids, list) or not snippet_ids:
-        raise ValueError("Event missing snippet_ids")
-    if not set(snippet_ids).issubset(allowed_snippet_ids):
-        raise ValueError("Event references unknown snippet_ids")
     if event_type not in EVENT_TYPES:
         raise ValueError(f"Unknown event type: {event_type}")
-    if not isinstance(summary, str) or not summary.strip():
-        raise ValueError("Event missing summary")
+    snippet_ids = validate_snippet_ids(snippet_ids, allowed_snippet_ids)
+    summary = require_non_empty_string(summary, "summary")
     if not isinstance(framework_signals, list):
         raise ValueError("framework_signals must be a list")
 
@@ -402,10 +511,101 @@ def validate_event(event: dict[str, Any], allowed_snippet_ids: set[str]) -> dict
     return {
         "event_id": event_id.strip(),
         "chunk_id": chunk_id.strip(),
-        "snippet_ids": ordered_dedupe([snippet_id for snippet_id in snippet_ids if isinstance(snippet_id, str)]),
+        "snippet_ids": snippet_ids,
         "type": event_type,
         "framework_signals": validated_signals,
-        "summary": summary.strip(),
+        "summary": summary,
+    }
+
+
+def validate_character_record(
+    chunk_id: str,
+    raw_record: Any,
+    allowed_snippet_ids: set[str],
+    ordinal: int,
+) -> dict[str, Any]:
+    if not isinstance(raw_record, dict):
+        raise ValueError("Character record must be an object")
+    return {
+        "character_id": f"{chunk_id}-char-{ordinal}",
+        "chunk_id": chunk_id,
+        "snippet_ids": validate_snippet_ids(raw_record.get("snippet_ids"), allowed_snippet_ids),
+        "name": require_non_empty_string(raw_record.get("name"), "character.name"),
+        "aliases": validate_optional_aliases(raw_record.get("aliases")),
+        "role": require_non_empty_string(raw_record.get("role"), "character.role"),
+        "summary": require_non_empty_string(raw_record.get("summary"), "character.summary"),
+    }
+
+
+def validate_dialogue_record(
+    chunk_id: str,
+    raw_record: Any,
+    allowed_snippet_ids: set[str],
+    ordinal: int,
+) -> dict[str, Any]:
+    if not isinstance(raw_record, dict):
+        raise ValueError("Dialogue record must be an object")
+    return {
+        "dialogue_id": f"{chunk_id}-dlg-{ordinal}",
+        "chunk_id": chunk_id,
+        "snippet_ids": validate_snippet_ids(raw_record.get("snippet_ids"), allowed_snippet_ids),
+        "speaker": require_non_empty_string(raw_record.get("speaker"), "dialogue.speaker"),
+        "addressee": require_non_empty_string(raw_record.get("addressee"), "dialogue.addressee"),
+        "speech_act": require_non_empty_string(raw_record.get("speech_act"), "dialogue.speech_act"),
+        "summary": require_non_empty_string(raw_record.get("summary"), "dialogue.summary"),
+    }
+
+
+def validate_setting_record(
+    chunk_id: str,
+    raw_record: Any,
+    allowed_snippet_ids: set[str],
+    ordinal: int,
+) -> dict[str, Any]:
+    if not isinstance(raw_record, dict):
+        raise ValueError("Setting record must be an object")
+    return {
+        "setting_id": f"{chunk_id}-set-{ordinal}",
+        "chunk_id": chunk_id,
+        "snippet_ids": validate_snippet_ids(raw_record.get("snippet_ids"), allowed_snippet_ids),
+        "location": require_non_empty_string(raw_record.get("location"), "setting.location"),
+        "time_marker": require_non_empty_string(raw_record.get("time_marker"), "setting.time_marker"),
+        "social_context": require_non_empty_string(raw_record.get("social_context"), "setting.social_context"),
+        "summary": require_non_empty_string(raw_record.get("summary"), "setting.summary"),
+    }
+
+
+def validate_substrate_payload(
+    chunk_id: str,
+    payload: Any,
+    allowed_snippet_ids: set[str],
+) -> dict[str, list[dict[str, Any]]]:
+    if not isinstance(payload, dict):
+        raise ValueError("Substrate payload must be an object")
+
+    characters_raw = payload.get("characters", [])
+    dialogue_raw = payload.get("dialogue_turns", [])
+    settings_raw = payload.get("settings", [])
+    if not isinstance(characters_raw, list):
+        raise ValueError("characters must be a list")
+    if not isinstance(dialogue_raw, list):
+        raise ValueError("dialogue_turns must be a list")
+    if not isinstance(settings_raw, list):
+        raise ValueError("settings must be a list")
+
+    return {
+        "characters": [
+            validate_character_record(chunk_id, record, allowed_snippet_ids, ordinal)
+            for ordinal, record in enumerate(characters_raw, start=1)
+        ],
+        "dialogue_turns": [
+            validate_dialogue_record(chunk_id, record, allowed_snippet_ids, ordinal)
+            for ordinal, record in enumerate(dialogue_raw, start=1)
+        ],
+        "settings": [
+            validate_setting_record(chunk_id, record, allowed_snippet_ids, ordinal)
+            for ordinal, record in enumerate(settings_raw, start=1)
+        ],
     }
 
 
@@ -481,6 +681,11 @@ def parse_extraction_output(output: str, chunk_id: str, allowed_snippet_ids: set
     if len(events) < MIN_EVENTS_PER_CHUNK:
         raise ValueError(f"Expected at least {MIN_EVENTS_PER_CHUNK} events for {chunk_id}, got {len(events)}")
     return events
+
+
+def parse_substrate_output(output: str, chunk_id: str, allowed_snippet_ids: set[str]) -> dict[str, list[dict[str, Any]]]:
+    payload = extract_first_json_value(output)
+    return validate_substrate_payload(chunk_id, payload, allowed_snippet_ids)
 
 
 def validate_framework_result(
@@ -591,17 +796,16 @@ async def embed_many(texts: list[str]) -> list[list[float]]:
     return await asyncio.gather(*[get_nomic_embedding(text) for text in texts])
 
 
-async def generate_global_outline(text: str) -> str:
+async def generate_global_outline(outline_samples: list[dict[str, Any]]) -> str:
     t0 = time.time()
     print("\n--- Phase 1: Generating Global Outline (stratified, 30 snippets) ---")
-    snippets = select_snippets_stratified(text)
-    coverage = sum(len(snippet) for _, snippet in snippets)
-    print(f"  Snippets: {len(snippets)}, coverage: {coverage:,} chars ({coverage / len(text) * 100:.1f}%)")
+    coverage = sum(len(sample["text"]) for sample in outline_samples)
+    print(f"  Snippets: {len(outline_samples)}, coverage: {coverage:,} chars")
 
     snippets_text = "\n\n---\n\n".join(
-        f"[~{pct:.0f}%] {snippet_text}" for pct, snippet_text in snippets
+        f"[~{sample['position_percent']:.0f}%] {sample['text']}" for sample in outline_samples
     )
-    outline = await run_gemini_cli(OUTLINE_PROMPT.format(n=len(snippets), snippets_text=snippets_text))
+    outline = await run_gemini_cli(OUTLINE_PROMPT.format(n=len(outline_samples), snippets_text=snippets_text))
     if not outline.strip():
         raise RuntimeError("Global outline generation returned empty output")
     print(f"  Outline generated in {time.time() - t0:.2f}s ({len(outline):,} chars)")
@@ -621,29 +825,66 @@ async def extract_dynamic_keywords(outline: str) -> list[str]:
     return keywords
 
 
-def chunk_cache_base(book_file: str, chunk_id: str, micro_chunks: list[str]) -> str:
-    digest = hashlib.sha256("".join(micro_chunks).encode("utf-8")).hexdigest()[:12]
-    return f"{book_file}.{NTSMR_VERSION}.{MICRO_CHUNK_SIZE}.{chunk_id}.{digest}"
+def chunk_cache_base(book_file: str, chunk_id: str, micro_chunks: list[dict[str, Any]]) -> str:
+    digest = hashlib.sha256("".join(chunk["text"] for chunk in micro_chunks).encode("utf-8")).hexdigest()[:12]
+    return f"{book_file}.{NTSMR_VERSION}.{CACHE_SCHEMA_VERSION}.{MICRO_CHUNK_SIZE}.{chunk_id}.{digest}"
 
 
-def load_or_build_index(book_file: str, chunk_id: str, micro_chunks: list[str]):
+def normalize_cached_micro_chunks(cached_chunks: Any) -> list[dict[str, Any]]:
+    if not isinstance(cached_chunks, list):
+        raise ValueError("Cached chunks payload must be a list")
+
+    normalized = []
+    for index, item in enumerate(cached_chunks):
+        if isinstance(item, str):
+            normalized.append(
+                {
+                    "source_index": index,
+                    "start_char": None,
+                    "end_char": None,
+                    "text": item,
+                }
+            )
+            continue
+        if not isinstance(item, dict):
+            raise ValueError("Cached chunk must be a string or object")
+        text = item.get("text")
+        if not isinstance(text, str) or not text:
+            raise ValueError("Cached chunk missing text")
+        start_char = item.get("start_char")
+        end_char = item.get("end_char")
+        normalized.append(
+            {
+                "source_index": int(item.get("source_index", index)),
+                "start_char": int(start_char) if start_char is not None else None,
+                "end_char": int(end_char) if end_char is not None else None,
+                "text": text,
+            }
+        )
+    return normalized
+
+
+def load_or_build_index(book_file: str, chunk_id: str, micro_chunks: list[dict[str, Any]]):
     cache_base = chunk_cache_base(book_file, chunk_id, micro_chunks)
     faiss_path = f"{cache_base}.faiss"
     chunks_path = f"{cache_base}.chunks.json"
     if os.path.exists(faiss_path) and os.path.exists(chunks_path):
-        index = faiss.read_index(faiss_path)
-        with open(chunks_path, "r", encoding="utf-8") as handle:
-            cached_chunks = json.load(handle)
-        return index, cached_chunks, faiss_path
+        try:
+            index = faiss.read_index(faiss_path)
+            with open(chunks_path, "r", encoding="utf-8") as handle:
+                cached_chunks = normalize_cached_micro_chunks(json.load(handle))
+            return index, cached_chunks, faiss_path
+        except Exception:
+            pass
     return None, None, faiss_path
 
 
-async def build_faiss_index(book_file: str, chunk_id: str, micro_chunks: list[str]):
+async def build_faiss_index(book_file: str, chunk_id: str, micro_chunks: list[dict[str, Any]]):
     index, cached_chunks, faiss_path = load_or_build_index(book_file, chunk_id, micro_chunks)
     if index is not None and cached_chunks is not None:
         return index, cached_chunks, faiss_path, True
 
-    embeddings = await embed_many(micro_chunks)
+    embeddings = await embed_many([chunk["text"] for chunk in micro_chunks])
     valid_pairs = [(chunk, embedding) for chunk, embedding in zip(micro_chunks, embeddings) if embedding]
     if not valid_pairs:
         raise RuntimeError(f"No embeddings generated for {chunk_id}")
@@ -659,13 +900,13 @@ async def build_faiss_index(book_file: str, chunk_id: str, micro_chunks: list[st
     chunks_path = f"{cache_base}.chunks.json"
     faiss.write_index(index, faiss_path)
     with open(chunks_path, "w", encoding="utf-8") as handle:
-        json.dump(list(valid_micro_chunks), handle)
+        json.dump(list(valid_micro_chunks), handle, ensure_ascii=False)
     return index, list(valid_micro_chunks), faiss_path, False
 
 
 def select_snippets_for_chunk(
     chunk_id: str,
-    valid_micro_chunks: list[str],
+    valid_micro_chunks: list[dict[str, Any]],
     index: Any,
     keyword_vectors: list[tuple[str, list[float]]],
 ) -> list[dict[str, Any]]:
@@ -684,12 +925,16 @@ def select_snippets_for_chunk(
     selected_indices.sort()
     snippets = []
     for ordinal, idx in enumerate(selected_indices, start=1):
+        source_chunk = valid_micro_chunks[idx]
         snippets.append(
             {
+                "chunk_id": chunk_id,
                 "snippet_id": f"{chunk_id}-s{ordinal}",
-                "source_index": idx,
+                "source_index": source_chunk["source_index"],
+                "start_char": source_chunk.get("start_char"),
+                "end_char": source_chunk.get("end_char"),
                 "score": round(best_by_index[idx], 6),
-                "text": valid_micro_chunks[idx],
+                "text": source_chunk["text"],
             }
         )
     if not snippets:
@@ -746,9 +991,29 @@ Format your response EXACTLY like this:
         return parse_extraction_output(repair_output, chunk_id, allowed_snippet_ids)
 
 
+async def extract_substrate_for_chunk(
+    chunk_id: str,
+    snippets: list[dict[str, Any]],
+    outline_context: str,
+) -> dict[str, list[dict[str, Any]]]:
+    prompt = SUBSTRATE_EXTRACTION_PROMPT.format(
+        chunk_id=chunk_id,
+        outline_context=outline_context,
+        snippets_text=render_snippets(snippets),
+    )
+    allowed_snippet_ids = {snippet["snippet_id"] for snippet in snippets}
+    output = await run_gemini_cli(prompt)
+    try:
+        return parse_substrate_output(output, chunk_id, allowed_snippet_ids)
+    except Exception as exc:
+        repair_prompt = prompt + f"\n\nYour previous output failed validation: {exc}. Re-output corrected JSON only."
+        repair_output = await run_gemini_cli(repair_prompt, retries=1)
+        return parse_substrate_output(repair_output, chunk_id, allowed_snippet_ids)
+
+
 async def process_chunk(
     chunk_idx: int,
-    micro_chunks: list[str],
+    micro_chunks: list[dict[str, Any]],
     keyword_vectors: list[tuple[str, list[float]]],
     outline_context: str,
     book_file: str,
@@ -765,6 +1030,7 @@ async def process_chunk(
 
         snippets = select_snippets_for_chunk(chunk_id, valid_micro_chunks, index, keyword_vectors)
         events = await extract_events_for_chunk(chunk_id, snippets, outline_context)
+        substrate = await extract_substrate_for_chunk(chunk_id, snippets, outline_context)
         print(f"[{chunk_id}] Extracted {len(events)} validated events")
         return {
             "chunk_id": chunk_id,
@@ -773,6 +1039,12 @@ async def process_chunk(
             "snippets": snippets,
             "event_count": len(events),
             "events": events,
+            "character_count": len(substrate["characters"]),
+            "dialogue_count": len(substrate["dialogue_turns"]),
+            "setting_count": len(substrate["settings"]),
+            "characters": substrate["characters"],
+            "dialogue_turns": substrate["dialogue_turns"],
+            "settings": substrate["settings"],
             "duration_seconds": round(time.time() - chunk_start, 2),
         }
 
@@ -836,17 +1108,28 @@ async def synthesize_frameworks(
     return {framework_name: payload for framework_name, payload in pairs}
 
 
+def write_jsonl(path: str, rows: list[dict[str, Any]]) -> None:
+    with open(path, "w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(to_json_safe(row), ensure_ascii=False) + "\n")
+
+
 def build_report(
     book_file: str,
     artifact_paths: ArtifactPaths,
     keywords: list[str],
     global_outline: str,
     outline_context: str,
+    outline_samples: list[dict[str, Any]],
     chunk_reports: list[dict[str, Any]],
     synthesis_payload: dict[str, dict[str, Any]],
     elapsed_seconds: float,
 ) -> dict[str, Any]:
     all_events = [event for chunk in chunk_reports for event in chunk["events"]]
+    total_snippets = sum(chunk["snippet_count"] for chunk in chunk_reports)
+    total_characters = sum(chunk.get("character_count", 0) for chunk in chunk_reports)
+    total_dialogue = sum(chunk.get("dialogue_count", 0) for chunk in chunk_reports)
+    total_settings = sum(chunk.get("setting_count", 0) for chunk in chunk_reports)
     routed_frameworks = {
         framework_name: {
             "event_count": payload["event_count"],
@@ -861,8 +1144,16 @@ def build_report(
         "keywords": keywords,
         "global_outline": global_outline,
         "outline_context": outline_context,
+        "outline_samples": outline_samples,
         "chunk_count": len(chunk_reports),
         "event_count": len(all_events),
+        "substrate": {
+            "outline_sample_count": len(outline_samples),
+            "snippet_count": total_snippets,
+            "character_count": total_characters,
+            "dialogue_count": total_dialogue,
+            "setting_count": total_settings,
+        },
         "frameworks": routed_frameworks,
         "chunks": [
             {
@@ -870,6 +1161,9 @@ def build_report(
                 "cache_path": chunk["cache_path"],
                 "snippet_count": chunk["snippet_count"],
                 "event_count": chunk["event_count"],
+                "character_count": chunk.get("character_count", 0),
+                "dialogue_count": chunk.get("dialogue_count", 0),
+                "setting_count": chunk.get("setting_count", 0),
                 "duration_seconds": chunk["duration_seconds"],
                 "snippets": chunk["snippets"],
             }
@@ -890,12 +1184,17 @@ async def main():
         text = handle.read()
 
     macro_chunks = [
-        text[index : index + MACRO_CHUNK_SIZE]
+        {
+            "start_char": index,
+            "end_char": min(index + MACRO_CHUNK_SIZE, len(text)),
+            "text": text[index : index + MACRO_CHUNK_SIZE],
+        }
         for index in range(0, len(text), MACRO_CHUNK_SIZE)
     ]
     print(f"Loaded {args.book_file}: {len(text):,} characters, {len(macro_chunks)} macro-chunks.")
 
-    global_outline = await generate_global_outline(text)
+    outline_samples = build_outline_samples(text)
+    global_outline = await generate_global_outline(outline_samples)
     outline_context = build_outline_context(global_outline)
     dynamic_keywords = await extract_dynamic_keywords(global_outline)
     keywords = combine_keywords(dynamic_keywords)
@@ -915,7 +1214,7 @@ async def main():
         *[
             process_chunk(
                 chunk_idx + 1,
-                [macro_chunk[i : i + MICRO_CHUNK_SIZE] for i in range(0, len(macro_chunk), MICRO_CHUNK_SIZE)],
+                build_micro_chunk_records(macro_chunk["text"], start_char=macro_chunk["start_char"]),
                 keyword_vectors,
                 outline_context,
                 args.book_file,
@@ -927,14 +1226,40 @@ async def main():
     print(f"Phase 2 complete: {len(all_events)} total validated events.")
 
     synthesis_payload = await synthesize_frameworks(all_events, outline_context)
+    all_snippets = [snippet for chunk in chunk_reports for snippet in chunk["snippets"]]
+    all_characters = [record for chunk in chunk_reports for record in chunk["characters"]]
+    all_dialogue = [record for chunk in chunk_reports for record in chunk["dialogue_turns"]]
+    all_settings = [record for chunk in chunk_reports for record in chunk["settings"]]
 
     artifact_paths = resolve_artifact_paths(args.output_file)
-    for path_str in [artifact_paths.events_path, artifact_paths.synthesis_path, artifact_paths.report_path]:
+    for path_str in [
+        artifact_paths.events_path,
+        artifact_paths.synthesis_path,
+        artifact_paths.report_path,
+        artifact_paths.outline_path,
+        artifact_paths.snippets_path,
+        artifact_paths.characters_path,
+        artifact_paths.dialogue_path,
+        artifact_paths.settings_path,
+    ]:
         Path(path_str).parent.mkdir(parents=True, exist_ok=True)
 
-    with open(artifact_paths.events_path, "w", encoding="utf-8") as handle:
-        for event in all_events:
-            handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+    outline_payload = {
+        "ntsmr_version": NTSMR_VERSION,
+        "book_file": args.book_file,
+        "outline_samples": outline_samples,
+        "global_outline": global_outline,
+        "outline_context": outline_context,
+        "keywords": keywords,
+    }
+    with open(artifact_paths.outline_path, "w", encoding="utf-8") as handle:
+        json.dump(to_json_safe(outline_payload), handle, indent=2, ensure_ascii=False)
+
+    write_jsonl(artifact_paths.snippets_path, all_snippets)
+    write_jsonl(artifact_paths.characters_path, all_characters)
+    write_jsonl(artifact_paths.dialogue_path, all_dialogue)
+    write_jsonl(artifact_paths.settings_path, all_settings)
+    write_jsonl(artifact_paths.events_path, all_events)
 
     with open(artifact_paths.synthesis_path, "w", encoding="utf-8") as handle:
         json.dump(synthesis_payload, handle, indent=2, ensure_ascii=False)
@@ -945,6 +1270,7 @@ async def main():
         keywords,
         global_outline,
         outline_context,
+        outline_samples,
         chunk_reports,
         synthesis_payload,
         time.time() - start_time,
@@ -953,6 +1279,11 @@ async def main():
         json.dump(report_payload, handle, indent=2, ensure_ascii=False)
 
     print(f"\nDone! Pipeline completed in {time.time() - start_time:.2f} seconds.")
+    print(f"Outline: {artifact_paths.outline_path}")
+    print(f"Snippets: {artifact_paths.snippets_path}")
+    print(f"Characters: {artifact_paths.characters_path}")
+    print(f"Dialogue: {artifact_paths.dialogue_path}")
+    print(f"Settings: {artifact_paths.settings_path}")
     print(f"Events: {artifact_paths.events_path}")
     print(f"Synthesis: {artifact_paths.synthesis_path}")
     print(f"Report: {artifact_paths.report_path}")

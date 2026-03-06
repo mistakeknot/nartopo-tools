@@ -13,8 +13,9 @@ This is a **Hybrid Parallel Architecture** combining:
 2. **Stratified Global Outline:** Samples opening, ending, and evenly spaced interior snippets to build a global outline plus a condensed character/reference context.
 3. **Precomputed Keyword Retrieval:** Deduplicates static plus dynamic retrieval keywords and embeds them once per run, rather than once per chunk.
 4. **Parallel Fan-Out with Evidence IDs:** Processes each 150k-character chunk into validated JSONL events carrying `event_id`, `chunk_id`, `snippet_ids`, structural type, and canonical framework signals.
-5. **Routed Framework Synthesis:** Framework agents receive the smallest relevant event subset possible and must cite `evidence_event_ids` in a strict synthesis object.
-6. **Split Machine Artifacts:** The pipeline emits strict `events.jsonl`, `synthesis.json`, and `report.json` artifacts so downstream tooling can validate and ingest them without regex parsing.
+5. **Reusable Narrative Substrate:** Persists standalone `outline`, `snippets`, `characters`, `dialogue`, and `settings` artifacts, each tied back to stable snippet IDs for later framework work without rerunning extraction.
+6. **Routed Framework Synthesis:** Framework agents receive the smallest relevant event subset possible and must cite `evidence_event_ids` in a strict synthesis object.
+7. **Split Machine Artifacts:** The pipeline emits strict machine-readable artifacts so downstream tooling can validate and ingest them without regex parsing.
 
 **Usage:**
 ```bash
@@ -22,6 +23,11 @@ uv run scripts/semantic_map_reduce.py "../../books/{Author Name}/{Book Title}.tx
 ```
 
 This command writes:
+- `/tmp/{Book Title}_timeline.outline.json` — stratified outline samples, condensed outline context, and retrieval keywords
+- `/tmp/{Book Title}_timeline.snippets.jsonl` — retrieved snippet evidence with scores and source offsets
+- `/tmp/{Book Title}_timeline.characters.jsonl` — grounded character mentions and roles
+- `/tmp/{Book Title}_timeline.dialogue.jsonl` — grounded dialogue-turn records
+- `/tmp/{Book Title}_timeline.settings.jsonl` — grounded setting records
 - `/tmp/{Book Title}_timeline.jsonl` — strict event stream
 - `/tmp/{Book Title}_timeline.synthesis.json` — per-framework synthesis payload
 - `/tmp/{Book Title}_timeline.report.json` — routing, coverage, and snippet provenance report
