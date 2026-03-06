@@ -16,6 +16,7 @@ import numpy as np
 
 NTSMR_VERSION = "2.3"
 CACHE_SCHEMA_VERSION = "substrate-v1"
+MIN_SOURCE_TEXT_CHARS = int(os.environ.get("NTSMR_MIN_SOURCE_TEXT_CHARS", "1500"))
 
 MACRO_CHUNK_SIZE = 150_000
 MICRO_CHUNK_SIZE = 4_000
@@ -35,6 +36,16 @@ GEMINI_RETRIES = int(os.environ.get("NTSMR_GEMINI_RETRIES", "2"))
 OLLAMA_TIMEOUT_SECONDS = int(os.environ.get("NTSMR_OLLAMA_TIMEOUT_SECONDS", "10"))
 
 EVENT_TYPES = {"action", "dialogue", "exposition", "bureaucracy"}
+SUSPICIOUS_SOURCE_PATTERNS = (
+    "@page {",
+    "body {",
+    "<html",
+    "<body",
+    "电子书",
+    "公众号",
+    "网站：",
+    "cover",
+)
 
 STATIC_KEYWORDS = [
     "major plot progression action",
@@ -395,6 +406,37 @@ def resolve_artifact_paths(output_file: str) -> ArtifactPaths:
         dialogue_path=base + ".dialogue.jsonl",
         settings_path=base + ".settings.jsonl",
     )
+
+
+def assess_source_text_health(text: str) -> dict[str, Any]:
+    stripped = text.strip()
+    lowered = stripped.lower()
+    alpha_ratio = (
+        sum(1 for char in stripped if char.isalpha()) / max(len(stripped), 1)
+        if stripped
+        else 0.0
+    )
+    suspicious_hits = [pattern for pattern in SUSPICIOUS_SOURCE_PATTERNS if pattern in lowered]
+    looks_broken = len(stripped) < MIN_SOURCE_TEXT_CHARS
+    if not looks_broken and len(stripped) < 5_000 and alpha_ratio < 0.45 and suspicious_hits:
+        looks_broken = True
+    return {
+        "char_count": len(stripped),
+        "alpha_ratio": round(alpha_ratio, 3),
+        "suspicious_hits": suspicious_hits,
+        "looks_broken": looks_broken,
+    }
+
+
+def validate_source_text(text: str, book_file: str) -> dict[str, Any]:
+    health = assess_source_text_health(text)
+    if health["looks_broken"]:
+        hint = ", ".join(health["suspicious_hits"]) or "too short"
+        raise RuntimeError(
+            f"Source text for {book_file} looks broken: {health['char_count']} chars, "
+            f"alpha_ratio={health['alpha_ratio']}, hits={hint}"
+        )
+    return health
 
 
 def select_snippets_stratified(text: str, n_snippets: int = N_SNIPPETS, snippet_size: int = SNIPPET_SIZE):
@@ -1182,6 +1224,7 @@ async def main():
     start_time = time.time()
     with open(args.book_file, "r", encoding="utf-8") as handle:
         text = handle.read()
+    validate_source_text(text, args.book_file)
 
     macro_chunks = [
         {
