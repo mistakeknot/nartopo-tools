@@ -26,7 +26,7 @@ uv run scripts/semantic_map_reduce.py "../../books/{Author Name}/{Book Title}.tx
 ```bash
 # Default production Gemini run label
 uv run scripts/semantic_map_reduce.py "../../books/{Author Name}/{Book Title}.txt" "/tmp/{Book Title}_timeline.jsonl" \
-  --run-label NTSMR-2.3-gemini-3.1-pr-preview
+  --run-label NTSMR-2.3-gemini-3.1-pro-preview
 
 # Codex Exec backend
 uv run scripts/semantic_map_reduce.py "../../books/{Author Name}/{Book Title}.txt" "/tmp/{Book Title}_timeline.jsonl" \

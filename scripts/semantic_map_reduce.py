@@ -19,7 +19,7 @@ import numpy as np
 NTSMR_VERSION = "2.3"
 CACHE_SCHEMA_VERSION = "substrate-v1"
 MIN_SOURCE_TEXT_CHARS = int(os.environ.get("NTSMR_MIN_SOURCE_TEXT_CHARS", "1500"))
-DEFAULT_GEMINI_MODEL_LABEL = os.environ.get("NTSMR_GEMINI_MODEL_LABEL", "gemini-3.1-pr-preview")
+DEFAULT_GEMINI_MODEL_LABEL = os.environ.get("NTSMR_GEMINI_MODEL_LABEL", "gemini-3.1-pro-preview")
 DEFAULT_LLM_BACKEND = os.environ.get("NTSMR_LLM_BACKEND", "gemini")
 DEFAULT_CODEX_MODEL = os.environ.get("NTSMR_CODEX_MODEL", "gpt-5.4")
 DEFAULT_CODEX_REASONING_EFFORT = os.environ.get("NTSMR_CODEX_REASONING_EFFORT")
