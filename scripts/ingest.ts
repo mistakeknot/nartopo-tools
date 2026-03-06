@@ -78,7 +78,7 @@ async function main() {
 
   // Find the first EPUB result
   const epubResult = searchResult.results.find(
-    (r: any) => r.format.toLowerCase() === "epub"
+    (r: any) => (r.format || "").toLowerCase() === "epub"
   );
   if (!epubResult) {
     console.error("No EPUB format found in the top search results.");
@@ -160,12 +160,13 @@ async function main() {
       }
     }
 
-    // Filter to HTML/XHTML entries
+    // Filter to HTML/XHTML/XML entries
     const htmlEntries = zipEntries.filter(
       (entry) =>
         entry.name.endsWith(".html") ||
         entry.name.endsWith(".xhtml") ||
-        entry.name.endsWith(".htm")
+        entry.name.endsWith(".htm") ||
+        entry.name.endsWith(".xml")
     );
 
     // Sort by OPF spine order if available, otherwise natural sort
