@@ -23,8 +23,11 @@ DEFAULT_GEMINI_MODEL_LABEL = os.environ.get("NTSMR_GEMINI_MODEL_LABEL", "gemini-
 DEFAULT_LLM_BACKEND = os.environ.get("NTSMR_LLM_BACKEND", "gemini")
 DEFAULT_CODEX_MODEL = os.environ.get("NTSMR_CODEX_MODEL", "gpt-5.4")
 DEFAULT_CODEX_REASONING_EFFORT = os.environ.get("NTSMR_CODEX_REASONING_EFFORT")
-SUPPORTED_LLM_BACKENDS = {"gemini", "codex-exec"}
+DEFAULT_CLAUDE_MODEL = os.environ.get("NTSMR_CLAUDE_MODEL", "sonnet")
+DEFAULT_CLAUDE_REASONING_EFFORT = os.environ.get("NTSMR_CLAUDE_REASONING_EFFORT")
+SUPPORTED_LLM_BACKENDS = {"gemini", "codex-exec", "claude"}
 SUPPORTED_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
+CLAUDE_REASONING_EFFORTS = {"low", "medium", "high"}
 
 MACRO_CHUNK_SIZE = 150_000
 MICRO_CHUNK_SIZE = 4_000
@@ -425,6 +428,13 @@ def build_llm_config(
         normalized_model = (model or DEFAULT_GEMINI_MODEL_LABEL).strip()
         if normalized_reasoning:
             raise ValueError("Gemini backend does not support reasoning effort overrides")
+    elif normalized_backend == "claude":
+        normalized_model = (model or DEFAULT_CLAUDE_MODEL).strip()
+        normalized_reasoning = normalized_reasoning or DEFAULT_CLAUDE_REASONING_EFFORT
+        if not normalized_reasoning:
+            raise ValueError("Claude backend requires a reasoning effort")
+        if normalized_reasoning not in CLAUDE_REASONING_EFFORTS:
+            raise ValueError(f"Unsupported Claude reasoning effort: {normalized_reasoning} (must be low/medium/high)")
     else:
         normalized_model = (model or DEFAULT_CODEX_MODEL).strip()
         normalized_reasoning = normalized_reasoning or DEFAULT_CODEX_REASONING_EFFORT
@@ -964,12 +974,73 @@ async def run_codex_exec_cli(
     raise RuntimeError(f"Codex Exec failed after retries: {last_error}")
 
 
+def claude_cli_prompt(prompt: str) -> str:
+    return (
+        "You are being used as a structured text generation backend inside the NTSMR "
+        "narrative analysis pipeline. Do not use tools, do not inspect the filesystem, "
+        "do not ask follow-up questions, and do not add commentary outside the requested "
+        "format. Return only the requested output.\n\n"
+        + prompt
+    )
+
+
+async def run_claude_cli(
+    prompt: str,
+    config: LlmConfig,
+    timeout: int = GEMINI_TIMEOUT_SECONDS,
+    retries: int = GEMINI_RETRIES,
+) -> str:
+    last_error: Exception | None = None
+    stdin_prompt = claude_cli_prompt(prompt)
+    env = {**os.environ, "CLAUDECODE": ""}
+    for attempt in range(1, retries + 2):
+        command = [
+            "claude",
+            "-p",
+            "--model", config.model,
+            "--no-session-persistence",
+            "--dangerously-skip-permissions",
+            "--tools", "",
+        ]
+        if config.reasoning_effort:
+            command.extend(["--effort", config.reasoning_effort])
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(stdin_prompt.encode("utf-8")),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.communicate()
+            last_error = TimeoutError(f"claude timed out after {timeout}s")
+        else:
+            if process.returncode == 0 and stdout:
+                return stdout.decode("utf-8", errors="replace")
+            stderr_text = stderr.decode("utf-8", errors="replace").strip()
+            stdout_text = stdout.decode("utf-8", errors="replace").strip()
+            last_error = RuntimeError(
+                stderr_text or stdout_text or f"claude exited with code {process.returncode}"
+            )
+        if attempt <= retries:
+            await asyncio.sleep(attempt)
+    raise RuntimeError(f"Claude CLI failed after retries: {last_error}")
+
+
 async def run_llm_cli(prompt: str, timeout: int = GEMINI_TIMEOUT_SECONDS, retries: int = GEMINI_RETRIES) -> str:
     config = get_active_llm_config()
     if config.backend == "gemini":
         return await run_gemini_cli(prompt, timeout=timeout, retries=retries)
     if config.backend == "codex-exec":
         return await run_codex_exec_cli(prompt, config=config, timeout=timeout, retries=retries)
+    if config.backend == "claude":
+        return await run_claude_cli(prompt, config=config, timeout=timeout, retries=retries)
     raise RuntimeError(f"Unhandled LLM backend: {config.backend}")
 
 
@@ -1455,7 +1526,7 @@ async def main():
     parser.add_argument("output_file", help="Path to save the events JSONL or artifact base path")
     parser.add_argument("--llm-backend", choices=sorted(SUPPORTED_LLM_BACKENDS), default=None)
     parser.add_argument("--llm-model", default=None)
-    parser.add_argument("--llm-reasoning-effort", choices=sorted(SUPPORTED_REASONING_EFFORTS), default=None)
+    parser.add_argument("--llm-reasoning-effort", choices=sorted(SUPPORTED_REASONING_EFFORTS | CLAUDE_REASONING_EFFORTS), default=None)
     parser.add_argument("--run-label", default=None)
     parser.add_argument("--reuse-from", default=None, help="Reuse existing outline/events artifacts and rerun synthesis only")
     parser.add_argument("--score-only", action="store_true", help="Only synthesize the Quadrant Scores block")
