@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { validateWrittenFileContent } from "../scripts/add-analysis.ts";
+import { validateWrittenFileContent } from "../scripts/add-analysis";
 
 const validContent = `---
 title: "Example Book"

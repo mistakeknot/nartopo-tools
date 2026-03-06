@@ -5,6 +5,8 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import tempfile
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -17,6 +19,12 @@ import numpy as np
 NTSMR_VERSION = "2.3"
 CACHE_SCHEMA_VERSION = "substrate-v1"
 MIN_SOURCE_TEXT_CHARS = int(os.environ.get("NTSMR_MIN_SOURCE_TEXT_CHARS", "1500"))
+DEFAULT_GEMINI_MODEL_LABEL = os.environ.get("NTSMR_GEMINI_MODEL_LABEL", "gemini-3.1-pr-preview")
+DEFAULT_LLM_BACKEND = os.environ.get("NTSMR_LLM_BACKEND", "gemini")
+DEFAULT_CODEX_MODEL = os.environ.get("NTSMR_CODEX_MODEL", "gpt-5.4")
+DEFAULT_CODEX_REASONING_EFFORT = os.environ.get("NTSMR_CODEX_REASONING_EFFORT")
+SUPPORTED_LLM_BACKENDS = {"gemini", "codex-exec"}
+SUPPORTED_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 
 MACRO_CHUNK_SIZE = 150_000
 MICRO_CHUNK_SIZE = 4_000
@@ -360,6 +368,14 @@ class ArtifactPaths:
     settings_path: str
 
 
+@dataclass(frozen=True)
+class LlmConfig:
+    backend: str
+    model: str
+    reasoning_effort: str | None
+    run_label: str
+
+
 def ordered_dedupe(items: list[str]) -> list[str]:
     seen = set()
     ordered = []
@@ -381,6 +397,63 @@ def to_json_safe(value: Any) -> Any:
     if isinstance(value, tuple):
         return [to_json_safe(inner) for inner in value]
     return value
+
+
+def build_run_label(
+    pipeline_version: str,
+    model: str,
+    reasoning_effort: str | None = None,
+) -> str:
+    parts = [f"NTSMR-{pipeline_version}", model.strip()]
+    if reasoning_effort:
+        parts.append(reasoning_effort.strip().lower())
+    return "-".join(parts)
+
+
+def build_llm_config(
+    backend: str | None,
+    model: str | None,
+    reasoning_effort: str | None,
+    run_label: str | None,
+) -> LlmConfig:
+    normalized_backend = (backend or DEFAULT_LLM_BACKEND).strip().lower()
+    if normalized_backend not in SUPPORTED_LLM_BACKENDS:
+        raise ValueError(f"Unsupported LLM backend: {normalized_backend}")
+
+    normalized_reasoning = reasoning_effort.strip().lower() if reasoning_effort else None
+    if normalized_backend == "gemini":
+        normalized_model = (model or DEFAULT_GEMINI_MODEL_LABEL).strip()
+        if normalized_reasoning:
+            raise ValueError("Gemini backend does not support reasoning effort overrides")
+    else:
+        normalized_model = (model or DEFAULT_CODEX_MODEL).strip()
+        normalized_reasoning = normalized_reasoning or DEFAULT_CODEX_REASONING_EFFORT
+        if not normalized_reasoning:
+            raise ValueError("Codex Exec backend requires a reasoning effort")
+        if normalized_reasoning not in SUPPORTED_REASONING_EFFORTS:
+            raise ValueError(f"Unsupported reasoning effort: {normalized_reasoning}")
+
+    normalized_run_label = (run_label or "").strip() or build_run_label(
+        NTSMR_VERSION,
+        normalized_model,
+        normalized_reasoning,
+    )
+    return LlmConfig(
+        backend=normalized_backend,
+        model=normalized_model,
+        reasoning_effort=normalized_reasoning,
+        run_label=normalized_run_label,
+    )
+
+
+ACTIVE_LLM_CONFIG: LlmConfig | None = None
+
+
+def get_active_llm_config() -> LlmConfig:
+    global ACTIVE_LLM_CONFIG
+    if ACTIVE_LLM_CONFIG is None:
+        ACTIVE_LLM_CONFIG = build_llm_config(None, None, None, None)
+    return ACTIVE_LLM_CONFIG
 
 
 def combine_keywords(dynamic_keywords: list[str], static_keywords: list[str] | None = None) -> list[str]:
@@ -800,6 +873,106 @@ async def run_gemini_cli(prompt: str, timeout: int = GEMINI_TIMEOUT_SECONDS, ret
     raise RuntimeError(f"Gemini CLI failed after retries: {last_error}")
 
 
+def build_codex_exec_command(
+    prompt: str,
+    config: LlmConfig,
+    output_path: str,
+    workdir: str,
+) -> list[str]:
+    del prompt  # The prompt is passed via stdin to avoid shell length limits.
+    command = [
+        "codex",
+        "exec",
+        "-C",
+        workdir,
+        "--skip-git-repo-check",
+        "--color",
+        "never",
+        "--disable",
+        "apps",
+        "--ephemeral",
+        "-s",
+        "read-only",
+        "-o",
+        output_path,
+        "-m",
+        config.model,
+    ]
+    if config.reasoning_effort:
+        command.extend(["-c", f'model_reasoning_effort="{config.reasoning_effort}"'])
+    command.append("-")
+    return command
+
+
+def codex_exec_prompt(prompt: str) -> str:
+    return (
+        "You are being used as a structured text generation backend inside the NTSMR "
+        "narrative analysis pipeline. Do not use tools, do not inspect the filesystem, "
+        "do not ask follow-up questions, and do not add commentary outside the requested "
+        "format. Return only the requested output.\n\n"
+        + prompt
+    )
+
+
+async def run_codex_exec_cli(
+    prompt: str,
+    config: LlmConfig,
+    timeout: int = GEMINI_TIMEOUT_SECONDS,
+    retries: int = GEMINI_RETRIES,
+) -> str:
+    last_error: Exception | None = None
+    stdin_prompt = codex_exec_prompt(prompt)
+    for attempt in range(1, retries + 2):
+        with tempfile.TemporaryDirectory(prefix="ntsmr-codex-exec-") as tempdir:
+            output_path = os.path.join(tempdir, "codex-last-message.txt")
+            process = await asyncio.create_subprocess_exec(
+                *build_codex_exec_command(
+                    prompt=stdin_prompt,
+                    config=config,
+                    output_path=output_path,
+                    workdir=tempdir,
+                ),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(stdin_prompt.encode("utf-8")),
+                    timeout=timeout,
+                )
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.communicate()
+                last_error = TimeoutError(f"codex exec timed out after {timeout}s")
+            else:
+                if process.returncode == 0:
+                    if os.path.exists(output_path):
+                        output_text = Path(output_path).read_text(encoding="utf-8").strip()
+                        if output_text:
+                            return output_text
+                    stdout_text = stdout.decode("utf-8", errors="replace").strip()
+                    if stdout_text:
+                        return stdout_text
+                stderr_text = stderr.decode("utf-8", errors="replace").strip()
+                stdout_text = stdout.decode("utf-8", errors="replace").strip()
+                last_error = RuntimeError(
+                    stderr_text or stdout_text or f"codex exec exited with code {process.returncode}"
+                )
+        if attempt <= retries:
+            await asyncio.sleep(attempt)
+    raise RuntimeError(f"Codex Exec failed after retries: {last_error}")
+
+
+async def run_llm_cli(prompt: str, timeout: int = GEMINI_TIMEOUT_SECONDS, retries: int = GEMINI_RETRIES) -> str:
+    config = get_active_llm_config()
+    if config.backend == "gemini":
+        return await run_gemini_cli(prompt, timeout=timeout, retries=retries)
+    if config.backend == "codex-exec":
+        return await run_codex_exec_cli(prompt, config=config, timeout=timeout, retries=retries)
+    raise RuntimeError(f"Unhandled LLM backend: {config.backend}")
+
+
 def embedding_hosts() -> list[str]:
     primary = os.environ.get("OLLAMA_HOST")
     hosts = []
@@ -847,7 +1020,7 @@ async def generate_global_outline(outline_samples: list[dict[str, Any]]) -> str:
     snippets_text = "\n\n---\n\n".join(
         f"[~{sample['position_percent']:.0f}%] {sample['text']}" for sample in outline_samples
     )
-    outline = await run_gemini_cli(OUTLINE_PROMPT.format(n=len(outline_samples), snippets_text=snippets_text))
+    outline = await run_llm_cli(OUTLINE_PROMPT.format(n=len(outline_samples), snippets_text=snippets_text))
     if not outline.strip():
         raise RuntimeError("Global outline generation returned empty output")
     print(f"  Outline generated in {time.time() - t0:.2f}s ({len(outline):,} chars)")
@@ -857,7 +1030,7 @@ async def generate_global_outline(outline_samples: list[dict[str, Any]]) -> str:
 async def extract_dynamic_keywords(outline: str) -> list[str]:
     t0 = time.time()
     print("\n--- Extracting dynamic keywords from outline ---")
-    result = await run_gemini_cli(KEYWORD_EXTRACTION_PROMPT.format(outline=outline))
+    result = await run_llm_cli(KEYWORD_EXTRACTION_PROMPT.format(outline=outline))
     parsed = extract_first_json_value(result)
     if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
         print("  Warning: Could not parse dynamic keywords, falling back to static")
@@ -1024,12 +1197,12 @@ Format your response EXACTLY like this:
 """
 
     allowed_snippet_ids = {snippet["snippet_id"] for snippet in snippets}
-    output = await run_gemini_cli(prompt)
+    output = await run_llm_cli(prompt)
     try:
         return parse_extraction_output(output, chunk_id, allowed_snippet_ids)
     except Exception as exc:
         repair_prompt = prompt + f"\n\nYour previous output failed validation: {exc}. Re-output corrected JSONL only."
-        repair_output = await run_gemini_cli(repair_prompt, retries=1)
+        repair_output = await run_llm_cli(repair_prompt, retries=1)
         return parse_extraction_output(repair_output, chunk_id, allowed_snippet_ids)
 
 
@@ -1044,12 +1217,12 @@ async def extract_substrate_for_chunk(
         snippets_text=render_snippets(snippets),
     )
     allowed_snippet_ids = {snippet["snippet_id"] for snippet in snippets}
-    output = await run_gemini_cli(prompt)
+    output = await run_llm_cli(prompt)
     try:
         return parse_substrate_output(output, chunk_id, allowed_snippet_ids)
     except Exception as exc:
         repair_prompt = prompt + f"\n\nYour previous output failed validation: {exc}. Re-output corrected JSON only."
-        repair_output = await run_gemini_cli(repair_prompt, retries=1)
+        repair_output = await run_llm_cli(repair_prompt, retries=1)
         return parse_substrate_output(repair_output, chunk_id, allowed_snippet_ids)
 
 
@@ -1122,13 +1295,13 @@ Rules:
 {framework_config['prompt_suffix']}
 - Output JSON only. No markdown. No prose.
 """
-        output = await run_gemini_cli(prompt)
+        output = await run_llm_cli(prompt)
         try:
             payload = extract_first_json_value(output)
             validated = validate_framework_result(framework_name, payload, allowed_event_ids)
         except Exception as exc:
             repair_prompt = prompt + f"\n\nYour previous output failed validation: {exc}. Re-output corrected JSON only."
-            repair_output = await run_gemini_cli(repair_prompt, retries=1)
+            repair_output = await run_llm_cli(repair_prompt, retries=1)
             payload = extract_first_json_value(repair_output)
             validated = validate_framework_result(framework_name, payload, allowed_event_ids)
 
@@ -1140,11 +1313,13 @@ Rules:
 async def synthesize_frameworks(
     events: list[dict[str, Any]],
     outline_context: str,
+    framework_prompts: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    print(f"\n--- Phase 3: Synthesizing {len(FRAMEWORK_SYNTHESIS_PROMPTS)} frameworks ---")
+    framework_prompts = framework_prompts or FRAMEWORK_SYNTHESIS_PROMPTS
+    print(f"\n--- Phase 3: Synthesizing {len(framework_prompts)} frameworks ---")
     tasks = [
         synthesize_single_framework(framework_name, config, events, outline_context)
-        for framework_name, config in FRAMEWORK_SYNTHESIS_PROMPTS.items()
+        for framework_name, config in framework_prompts.items()
     ]
     pairs = await asyncio.gather(*tasks)
     return {framework_name: payload for framework_name, payload in pairs}
@@ -1154,6 +1329,36 @@ def write_jsonl(path: str, rows: list[dict[str, Any]]) -> None:
     with open(path, "w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(to_json_safe(row), ensure_ascii=False) + "\n")
+
+
+def read_jsonl(path: str) -> list[dict[str, Any]]:
+    rows = []
+    with open(path, "r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            payload = json.loads(stripped)
+            if not isinstance(payload, dict):
+                raise ValueError(f"Expected JSON object in {path}")
+            rows.append(payload)
+    return rows
+
+
+def framework_summary(synthesis_payload: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {
+        framework_name: {
+            "event_count": payload["event_count"],
+            "used_full_timeline_fallback": payload["used_full_timeline_fallback"],
+        }
+        for framework_name, payload in synthesis_payload.items()
+    }
+
+
+def select_framework_prompts(score_only: bool = False) -> dict[str, dict[str, Any]]:
+    if score_only:
+        return {"Quadrant Scores": FRAMEWORK_SYNTHESIS_PROMPTS["Quadrant Scores"]}
+    return FRAMEWORK_SYNTHESIS_PROMPTS
 
 
 def build_report(
@@ -1167,21 +1372,21 @@ def build_report(
     synthesis_payload: dict[str, dict[str, Any]],
     elapsed_seconds: float,
 ) -> dict[str, Any]:
+    llm_config = get_active_llm_config()
     all_events = [event for chunk in chunk_reports for event in chunk["events"]]
     total_snippets = sum(chunk["snippet_count"] for chunk in chunk_reports)
     total_characters = sum(chunk.get("character_count", 0) for chunk in chunk_reports)
     total_dialogue = sum(chunk.get("dialogue_count", 0) for chunk in chunk_reports)
     total_settings = sum(chunk.get("setting_count", 0) for chunk in chunk_reports)
-    routed_frameworks = {
-        framework_name: {
-            "event_count": payload["event_count"],
-            "used_full_timeline_fallback": payload["used_full_timeline_fallback"],
-        }
-        for framework_name, payload in synthesis_payload.items()
-    }
     return to_json_safe({
         "ntsmr_version": NTSMR_VERSION,
+        "ntsmr_run_label": llm_config.run_label,
         "book_file": book_file,
+        "llm": {
+            "backend": llm_config.backend,
+            "model": llm_config.model,
+            "reasoning_effort": llm_config.reasoning_effort,
+        },
         "artifacts": artifact_paths.__dict__,
         "keywords": keywords,
         "global_outline": global_outline,
@@ -1196,7 +1401,7 @@ def build_report(
             "dialogue_count": total_dialogue,
             "setting_count": total_settings,
         },
-        "frameworks": routed_frameworks,
+        "frameworks": framework_summary(synthesis_payload),
         "chunks": [
             {
                 "chunk_id": chunk["chunk_id"],
@@ -1215,13 +1420,113 @@ def build_report(
     })
 
 
+def build_reused_report(
+    source_report: dict[str, Any],
+    artifact_paths: ArtifactPaths,
+    synthesis_payload: dict[str, dict[str, Any]],
+    elapsed_seconds: float,
+) -> dict[str, Any]:
+    llm_config = get_active_llm_config()
+    report = dict(source_report)
+    report["ntsmr_version"] = NTSMR_VERSION
+    report["ntsmr_run_label"] = llm_config.run_label
+    report["llm"] = {
+        "backend": llm_config.backend,
+        "model": llm_config.model,
+        "reasoning_effort": llm_config.reasoning_effort,
+    }
+    report["artifacts"] = artifact_paths.__dict__
+    report["frameworks"] = framework_summary(synthesis_payload)
+    report["elapsed_seconds"] = round(elapsed_seconds, 2)
+    report["source_run_label"] = source_report.get("ntsmr_run_label")
+    report["source_artifacts"] = source_report.get("artifacts")
+    return to_json_safe(report)
+
+
+def copy_artifact_if_present(source_path: str, destination_path: str) -> None:
+    if source_path == destination_path or not os.path.exists(source_path):
+        return
+    shutil.copyfile(source_path, destination_path)
+
+
 async def main():
     parser = argparse.ArgumentParser(description="NTSMR Pipeline — Narrative Topology Semantic Map Reduce")
     parser.add_argument("book_file", help="Path to the raw text file")
     parser.add_argument("output_file", help="Path to save the events JSONL or artifact base path")
+    parser.add_argument("--llm-backend", choices=sorted(SUPPORTED_LLM_BACKENDS), default=None)
+    parser.add_argument("--llm-model", default=None)
+    parser.add_argument("--llm-reasoning-effort", choices=sorted(SUPPORTED_REASONING_EFFORTS), default=None)
+    parser.add_argument("--run-label", default=None)
+    parser.add_argument("--reuse-from", default=None, help="Reuse existing outline/events artifacts and rerun synthesis only")
+    parser.add_argument("--score-only", action="store_true", help="Only synthesize the Quadrant Scores block")
     args = parser.parse_args()
 
+    global ACTIVE_LLM_CONFIG
+    ACTIVE_LLM_CONFIG = build_llm_config(
+        backend=args.llm_backend,
+        model=args.llm_model,
+        reasoning_effort=args.llm_reasoning_effort,
+        run_label=args.run_label,
+    )
+
     start_time = time.time()
+    print(
+        f"LLM backend: {ACTIVE_LLM_CONFIG.backend}, model: {ACTIVE_LLM_CONFIG.model}, "
+        f"reasoning: {ACTIVE_LLM_CONFIG.reasoning_effort or 'default'}, "
+        f"run label: {ACTIVE_LLM_CONFIG.run_label}"
+    )
+    framework_prompts = select_framework_prompts(score_only=args.score_only)
+
+    artifact_paths = resolve_artifact_paths(args.output_file)
+    for path_str in [
+        artifact_paths.events_path,
+        artifact_paths.synthesis_path,
+        artifact_paths.report_path,
+        artifact_paths.outline_path,
+        artifact_paths.snippets_path,
+        artifact_paths.characters_path,
+        artifact_paths.dialogue_path,
+        artifact_paths.settings_path,
+    ]:
+        Path(path_str).parent.mkdir(parents=True, exist_ok=True)
+
+    if args.reuse_from:
+        source_artifacts = resolve_artifact_paths(args.reuse_from)
+        outline_payload = json.loads(Path(source_artifacts.outline_path).read_text(encoding="utf-8"))
+        source_report = json.loads(Path(source_artifacts.report_path).read_text(encoding="utf-8"))
+        all_events = read_jsonl(source_artifacts.events_path)
+        outline_context = outline_payload["outline_context"]
+        synthesis_payload = await synthesize_frameworks(
+            all_events,
+            outline_context,
+            framework_prompts=framework_prompts,
+        )
+
+        for source_path, destination_path in [
+            (source_artifacts.outline_path, artifact_paths.outline_path),
+            (source_artifacts.snippets_path, artifact_paths.snippets_path),
+            (source_artifacts.characters_path, artifact_paths.characters_path),
+            (source_artifacts.dialogue_path, artifact_paths.dialogue_path),
+            (source_artifacts.settings_path, artifact_paths.settings_path),
+            (source_artifacts.events_path, artifact_paths.events_path),
+        ]:
+            copy_artifact_if_present(source_path, destination_path)
+
+        with open(artifact_paths.synthesis_path, "w", encoding="utf-8") as handle:
+            json.dump(synthesis_payload, handle, indent=2, ensure_ascii=False)
+
+        report_payload = build_reused_report(
+            source_report=source_report,
+            artifact_paths=artifact_paths,
+            synthesis_payload=synthesis_payload,
+            elapsed_seconds=time.time() - start_time,
+        )
+        report_payload["score_only"] = args.score_only
+        with open(artifact_paths.report_path, "w", encoding="utf-8") as handle:
+            json.dump(report_payload, handle, indent=2, ensure_ascii=False)
+        print(f"Reused artifacts from {args.reuse_from}; synthesized {len(synthesis_payload)} frameworks.")
+        return
+
     with open(args.book_file, "r", encoding="utf-8") as handle:
         text = handle.read()
     validate_source_text(text, args.book_file)
@@ -1268,28 +1573,25 @@ async def main():
     all_events = [event for chunk in chunk_reports for event in chunk["events"]]
     print(f"Phase 2 complete: {len(all_events)} total validated events.")
 
-    synthesis_payload = await synthesize_frameworks(all_events, outline_context)
+    synthesis_payload = await synthesize_frameworks(
+        all_events,
+        outline_context,
+        framework_prompts=framework_prompts,
+    )
     all_snippets = [snippet for chunk in chunk_reports for snippet in chunk["snippets"]]
     all_characters = [record for chunk in chunk_reports for record in chunk["characters"]]
     all_dialogue = [record for chunk in chunk_reports for record in chunk["dialogue_turns"]]
     all_settings = [record for chunk in chunk_reports for record in chunk["settings"]]
 
-    artifact_paths = resolve_artifact_paths(args.output_file)
-    for path_str in [
-        artifact_paths.events_path,
-        artifact_paths.synthesis_path,
-        artifact_paths.report_path,
-        artifact_paths.outline_path,
-        artifact_paths.snippets_path,
-        artifact_paths.characters_path,
-        artifact_paths.dialogue_path,
-        artifact_paths.settings_path,
-    ]:
-        Path(path_str).parent.mkdir(parents=True, exist_ok=True)
-
     outline_payload = {
         "ntsmr_version": NTSMR_VERSION,
+        "ntsmr_run_label": ACTIVE_LLM_CONFIG.run_label,
         "book_file": args.book_file,
+        "llm": {
+            "backend": ACTIVE_LLM_CONFIG.backend,
+            "model": ACTIVE_LLM_CONFIG.model,
+            "reasoning_effort": ACTIVE_LLM_CONFIG.reasoning_effort,
+        },
         "outline_samples": outline_samples,
         "global_outline": global_outline,
         "outline_context": outline_context,
@@ -1318,6 +1620,7 @@ async def main():
         synthesis_payload,
         time.time() - start_time,
     )
+    report_payload["score_only"] = args.score_only
     with open(artifact_paths.report_path, "w", encoding="utf-8") as handle:
         json.dump(report_payload, handle, indent=2, ensure_ascii=False)
 
