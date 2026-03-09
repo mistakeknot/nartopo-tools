@@ -16,7 +16,7 @@ from typing import Any
 import faiss
 import numpy as np
 
-NTSMR_VERSION = "2.3"
+NTSMR_VERSION = "2.4"
 CACHE_SCHEMA_VERSION = "substrate-v1"
 MIN_SOURCE_TEXT_CHARS = int(os.environ.get("NTSMR_MIN_SOURCE_TEXT_CHARS", "1500"))
 DEFAULT_GEMINI_MODEL_LABEL = os.environ.get("NTSMR_GEMINI_MODEL_LABEL", "gemini-3.1-pro-preview")
@@ -38,6 +38,7 @@ MICRO_CHUNK_SIZE = 4_000
 SNIPPET_SIZE = 1_500
 N_SNIPPETS = 30
 MAX_SNIPPETS_PER_CHUNK = 12
+SHORT_TEXT_THRESHOLD = 30_000
 RETRIEVAL_TOP_K = 2
 MIN_EVENTS_PER_CHUNK = 1
 MIN_TAGGED_EVENTS = 2
@@ -106,7 +107,7 @@ FRAMEWORK_SYNTHESIS_PROMPTS = {
     },
     "Quadrant Scores": {
         "filter_tag": None,
-        "prompt_suffix": """Output exactly 6 floats between 0.0 and 1.0 for these metrics based on the timeline's pacing, conflict types, and plot structure:\n- time_linearity: 0.0=Linear, 1.0=Fractured\n- pacing_velocity: 0.0=Action-Driven, 1.0=Observational\n- threat_scale: 0.0=Individual, 1.0=Systemic\n- protagonist_fate: 0.0=Victory, 1.0=Assimilation\n- conflict_style: 0.0=Western Combat, 1.0=Kishotenketsu\n- price_type: 0.0=Physical, 1.0=Ideological\n\nScoring guidance:\n- Score the dominant narrative logic of the whole work, not just the loudest climax.\n- For time_linearity, documentary flashbacks, embedded records, recurring memory loops, and frame narration that repeatedly interrupts the forward plot should push upward even if the surface chronology is mostly sequential.\n- For pacing_velocity, sustained observation, reflection, investigation, and environmental interpretation should push upward even if a few scenes are violent.\n- For threat_scale, institutions, class systems, biopolitical sorting, civilizational infrastructures, and other social logics count as systemic even when the immediate scene is intimate.\n- For conflict_style, ask whether meaning is driven mainly by combat/opposition or by revelation, juxtaposition, atmosphere, and perspective shift.\n- Isolated violent climaxes should not outweigh a largely contemplative or exploratory structure.\n- For price_type, costs paid in identity, autonomy, status, belief, memory, relational bonds, or moral worldview should push toward ideological even when bodies are also at risk.\n\nThe analysis object must be:\n{\n  \"time_linearity\": 0.0,\n  \"pacing_velocity\": 0.0,\n  \"threat_scale\": 0.0,\n  \"protagonist_fate\": 0.0,\n  \"conflict_style\": 0.0,\n  \"price_type\": 0.0\n}""",
+        "prompt_suffix": """Output exactly 6 floats between 0.0 and 1.0 for these metrics based on the timeline's pacing, conflict types, and plot structure:\n- time_linearity: 0.0=Non-linear/fragmented timeline, 1.0=Strictly chronological\n- pacing_velocity: 0.0=Slow/contemplative, 1.0=Fast/action-driven\n- threat_scale: 0.0=Personal/intimate stakes, 1.0=Cosmic/civilizational stakes\n- protagonist_fate: 0.0=Tragic/defeated, 1.0=Triumphant/vindicated\n- conflict_style: 0.0=Internal/psychological, 1.0=External/physical\n- price_type: 0.0=Abstract/spiritual cost, 1.0=Concrete/material cost\n\nCalibration anchors (use these as reference points):\n- time_linearity: Slaughterhouse-Five ~0.15 (highly fragmented), Blindsight ~0.65 (mostly linear with frame), Old Man's War ~0.90 (straightforward chronology)\n- pacing_velocity: Solaris ~0.20 (slow philosophical), Neuromancer ~0.75 (fast cyberpunk), Ender's Game ~0.85 (action-driven)\n- threat_scale: Flowers for Algernon ~0.10 (deeply personal), Neuromancer ~0.50 (mixed), Three-Body Problem ~0.95 (civilizational extinction)\n- protagonist_fate: 1984 ~0.10 (total defeat), Blindsight ~0.30 (ambiguous/dark), Ender's Game ~0.70 (victory with cost)\n- conflict_style: Solaris ~0.15 (internal/philosophical), Left Hand of Darkness ~0.40 (mixed cultural), Ender's Game ~0.85 (combat-driven)\n- price_type: Solaris ~0.15 (existential/spiritual), Ender's Game ~0.60 (mixed moral+physical), Old Man's War ~0.90 (bodily/material)\n\nScoring guidance:\n- Scores of exactly 0.0 or 1.0 are reserved for absolute extremes. Most works should score between 0.10 and 0.90.\n- Score the dominant narrative logic of the whole work, not just the loudest climax.\n- For time_linearity, a mostly chronological narrative with minor flashbacks should score 0.7-0.85, not be pulled to the extremes.\n- For pacing_velocity, assess the overall tempo. A contemplative novel with a few action scenes is still slow-paced.\n- For threat_scale, institutions, class systems, biopolitical sorting, and civilizational stakes push upward. Personal stakes push downward.\n- For conflict_style, ask whether meaning is driven mainly by external combat/opposition (high) or by internal revelation, juxtaposition, and perspective shift (low).\n- For price_type, bodily harm, material destruction, and concrete losses push upward. Identity, autonomy, belief, memory, and relational costs push downward.\n\nThe analysis object must be:\n{\n  \"time_linearity\": 0.0,\n  \"pacing_velocity\": 0.0,\n  \"threat_scale\": 0.0,\n  \"protagonist_fate\": 0.0,\n  \"conflict_style\": 0.0,\n  \"price_type\": 0.0\n}""",
     },
     "The Freytag Pyramid": {
         "filter_tag": "freytag",
@@ -560,6 +561,40 @@ def build_outline_context(global_outline: str, max_chars: int = MAX_OUTLINE_CONT
     return context[:max_chars]
 
 
+SYNTHESIS_SOURCE_SAMPLE_SIZE = 5_000
+
+
+def build_source_text_sample(text: str, sample_size: int = SYNTHESIS_SOURCE_SAMPLE_SIZE) -> str:
+    """Build a source text sample for synthesis grounding: opening + closing."""
+    if len(text) <= sample_size:
+        return text
+    half = sample_size // 2
+    return (
+        f"[OPENING — first {half} chars]\n{text[:half]}\n\n"
+        f"[CLOSING — last {half} chars]\n{text[-half:]}"
+    )
+
+
+def extract_character_names(outline: str) -> list[str]:
+    """Extract character names from the DRAMATIS PERSONAE section of the outline."""
+    match = re.search(r"## DRAMATIS PERSONAE(.*?)(?=\n## |\Z)", outline, re.DOTALL)
+    if not match:
+        return []
+    section = match.group(1)
+    names = []
+    for line in section.strip().split("\n"):
+        line = line.strip().lstrip("- *•")
+        if not line:
+            continue
+        # Extract name before first parenthetical, comma, colon, or dash
+        name_match = re.match(r"^\*{0,2}([A-Z][^(,:\-—\n*]+)", line)
+        if name_match:
+            name = name_match.group(1).strip().rstrip("*")
+            if name and len(name) > 1:
+                names.append(name)
+    return names
+
+
 def build_micro_chunk_records(text: str, start_char: int = 0) -> list[dict[str, Any]]:
     records = []
     for source_index, chunk_start in enumerate(range(0, len(text), MICRO_CHUNK_SIZE)):
@@ -837,10 +872,40 @@ def validate_framework_result(
             raise ValueError(f"{framework_name} cited unknown event id: {event_id}")
 
     validate_structure(analysis, FRAMEWORK_ANALYSIS_SCHEMAS[framework_name])
-    return {
+    confidence = payload.get("confidence")
+    if isinstance(confidence, (int, float)):
+        confidence = max(0.0, min(1.0, float(confidence)))
+    else:
+        confidence = None
+    result = {
         "analysis": analysis,
         "evidence_event_ids": ordered_dedupe(evidence_event_ids),
     }
+    if confidence is not None:
+        result["confidence"] = confidence
+    return result
+
+
+FRAMEWORK_FALLBACK_KEYWORDS: dict[str, list[str]] = {
+    "todorov": ["equilibrium", "disruption", "recognition", "repair", "status quo", "inciting"],
+    "freytag": ["exposition", "rising", "climax", "falling", "resolution", "tension"],
+    "actantial": ["protagonist", "antagonist", "goal", "helper", "opponent", "quest"],
+    "three_act": ["setup", "confrontation", "resolution", "act", "plot point"],
+    "monomyth": ["hero", "journey", "call", "threshold", "ordeal", "return"],
+    "harmon": ["comfort", "need", "unfamiliar", "adapt", "find", "price", "change"],
+    "save_the_cat": ["opening", "catalyst", "debate", "midpoint", "dark night", "finale"],
+    "propp": ["villain", "donor", "hero", "departure", "struggle", "victory", "wedding"],
+    "kishotenketsu": ["introduction", "development", "twist", "conclusion", "juxtaposition"],
+    "protocol": ["rule", "protocol", "system", "failure", "insight", "institution"],
+    "genette_narrative": ["time", "duration", "frequency", "narrator", "focalization", "perspective"],
+    "levi_strauss": ["opposition", "binary", "mediator", "nature", "culture"],
+    "estrangement": ["familiar", "defamiliarize", "cognitive", "speculative", "shift"],
+    "bakhtin": ["space", "time", "chronotope", "threshold", "intersection"],
+    "aristotle": ["flaw", "reversal", "recognition", "catharsis", "tragedy"],
+    "jung": ["persona", "shadow", "anima", "trickster", "archetype", "unconscious"],
+    "transtextuality": ["allusion", "reference", "intertextual", "metatextual", "genre"],
+}
+MAX_FALLBACK_EVENTS = 30
 
 
 def filter_events_for_framework(
@@ -857,7 +922,26 @@ def filter_events_for_framework(
     ]
     if len(tagged) >= min_events:
         return tagged, False
-    return events, True
+
+    # Improved fallback: score events by keyword relevance instead of using all events
+    keywords = FRAMEWORK_FALLBACK_KEYWORDS.get(filter_tag, [])
+    if not keywords:
+        return events, True
+
+    def relevance_score(event: dict[str, Any]) -> float:
+        summary = event.get("summary", "").lower()
+        return sum(1 for kw in keywords if kw in summary)
+
+    scored = [(relevance_score(e), i, e) for i, e in enumerate(events)]
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    # Take tagged events + top relevant events up to MAX_FALLBACK_EVENTS
+    selected_ids = {id(e) for e in tagged}
+    result = list(tagged)
+    for score, _, event in scored:
+        if id(event) not in selected_ids and len(result) < MAX_FALLBACK_EVENTS:
+            result.append(event)
+            selected_ids.add(id(event))
+    return result, True
 
 
 async def run_gemini_cli(prompt: str, timeout: int = GEMINI_TIMEOUT_SECONDS, retries: int = GEMINI_RETRIES) -> str:
@@ -1302,6 +1386,49 @@ async def extract_substrate_for_chunk(
         return parse_substrate_output(repair_output, chunk_id, allowed_snippet_ids)
 
 
+async def process_short_text(
+    text: str,
+    outline_context: str,
+) -> dict[str, Any]:
+    """Process short texts (<SHORT_TEXT_THRESHOLD chars) without FAISS retrieval.
+
+    Uses the entire text as snippets, guaranteeing 100% coverage.
+    """
+    chunk_id = "chunk-1"
+    chunk_start = time.time()
+    print(f"[short-text] Processing {len(text):,} chars as single chunk (no FAISS)")
+    snippets = []
+    for i, start in enumerate(range(0, len(text), MICRO_CHUNK_SIZE)):
+        chunk_text = text[start : start + MICRO_CHUNK_SIZE]
+        snippets.append({
+            "chunk_id": chunk_id,
+            "snippet_id": f"{chunk_id}-s{i + 1}",
+            "source_index": i,
+            "start_char": start,
+            "end_char": start + len(chunk_text),
+            "score": 1.0,
+            "text": chunk_text,
+        })
+    events = await extract_events_for_chunk(chunk_id, snippets, outline_context)
+    substrate = await extract_substrate_for_chunk(chunk_id, snippets, outline_context)
+    print(f"[short-text] Extracted {len(events)} events from {len(snippets)} snippets")
+    return {
+        "chunk_id": chunk_id,
+        "cache_path": "short-text-bypass",
+        "snippet_count": len(snippets),
+        "snippets": snippets,
+        "event_count": len(events),
+        "events": events,
+        "character_count": len(substrate["characters"]),
+        "dialogue_count": len(substrate["dialogue_turns"]),
+        "setting_count": len(substrate["settings"]),
+        "characters": substrate["characters"],
+        "dialogue_turns": substrate["dialogue_turns"],
+        "settings": substrate["settings"],
+        "duration_seconds": round(time.time() - chunk_start, 2),
+    }
+
+
 async def process_chunk(
     chunk_idx: int,
     micro_chunks: list[dict[str, Any]],
@@ -1345,16 +1472,28 @@ async def synthesize_single_framework(
     framework_config: dict[str, Any],
     events: list[dict[str, Any]],
     outline_context: str,
+    source_text_sample: str = "",
+    character_names: list[str] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     async with SYNTHESIS_SEMAPHORE:
         selected_events, used_fallback = filter_events_for_framework(events, framework_config.get("filter_tag"))
         event_jsonl = "\n".join(json.dumps(event, ensure_ascii=False) for event in selected_events)
         allowed_event_ids = {event["event_id"] for event in selected_events}
+
+        source_section = ""
+        if source_text_sample:
+            source_section = f"\n## SOURCE TEXT SAMPLES\n{source_text_sample}\n"
+
+        character_section = ""
+        if character_names:
+            names_list = ", ".join(character_names[:50])
+            character_section = f"\n## VERIFIED CHARACTER NAMES\nOnly use these character names: {names_list}\n"
+
         prompt = f"""You are a Synthesis Sub-Agent specializing in {framework_name}.
 
 ## CHARACTER REFERENCE
 {outline_context}
-
+{character_section}{source_section}
 ## STRUCTURAL EVENT TIMELINE
 {event_jsonl}
 
@@ -1362,11 +1501,14 @@ Task:
 Output a single JSON object with exactly these keys:
 {{
   "analysis": <the framework analysis object>,
-  "evidence_event_ids": ["event ids from the timeline above"]
+  "evidence_event_ids": ["event ids from the timeline above"],
+  "confidence": <float 0.0-1.0, how confident you are in this analysis>
 }}
 
 Rules:
 - evidence_event_ids must contain 1-8 event IDs copied exactly from the timeline above.
+- confidence: 1.0 = highly confident with strong textual evidence, 0.5 = moderate confidence, 0.0 = speculative.
+- Only use character names that appear in the CHARACTER REFERENCE or VERIFIED CHARACTER NAMES sections.
 - The analysis value must match this schema:
 {framework_config['prompt_suffix']}
 - Output JSON only. No markdown. No prose.
@@ -1390,15 +1532,80 @@ async def synthesize_frameworks(
     events: list[dict[str, Any]],
     outline_context: str,
     framework_prompts: dict[str, dict[str, Any]] | None = None,
+    source_text_sample: str = "",
+    character_names: list[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     framework_prompts = framework_prompts or FRAMEWORK_SYNTHESIS_PROMPTS
     print(f"\n--- Phase 3: Synthesizing {len(framework_prompts)} frameworks ---")
     tasks = [
-        synthesize_single_framework(framework_name, config, events, outline_context)
+        synthesize_single_framework(
+            framework_name, config, events, outline_context,
+            source_text_sample=source_text_sample,
+            character_names=character_names,
+        )
         for framework_name, config in framework_prompts.items()
     ]
     pairs = await asyncio.gather(*tasks)
     return {framework_name: payload for framework_name, payload in pairs}
+
+
+POST_SYNTHESIS_CHECK_PROMPT = """You are a quality-control agent. Given a character outline and a set of framework analyses, flag any issues.
+
+## CHARACTER OUTLINE
+{outline_context}
+
+## FRAMEWORK ANALYSES
+{synthesis_summary}
+
+Check for:
+1. Character names used in analyses that do NOT appear in the outline
+2. Plot events described in analyses that contradict the outline's plot summary
+3. Any claims that seem fabricated or unsupported by the outline
+
+Output a JSON object:
+{{
+  "issues": [
+    {{"framework": "<name>", "type": "wrong_name|contradiction|unsupported", "detail": "<description>"}}
+  ]
+}}
+
+If no issues found, return {{"issues": []}}.
+Output JSON only."""
+
+
+async def post_synthesis_check(
+    synthesis_payload: dict[str, dict[str, Any]],
+    outline_context: str,
+) -> list[dict[str, str]]:
+    """Run a lightweight self-check on synthesis results."""
+    summary_parts = []
+    for fw_name, fw_data in synthesis_payload.items():
+        analysis = fw_data.get("analysis", {})
+        summary_parts.append(f"### {fw_name}\n{json.dumps(analysis, indent=1, ensure_ascii=False)}")
+    synthesis_summary = "\n\n".join(summary_parts)
+
+    # Only run check if synthesis is substantial enough
+    if len(synthesis_payload) <= 1:
+        return []
+
+    prompt = POST_SYNTHESIS_CHECK_PROMPT.format(
+        outline_context=outline_context,
+        synthesis_summary=synthesis_summary[:8000],
+    )
+    try:
+        output = await run_llm_cli(prompt, retries=1)
+        result = extract_first_json_value(output)
+        issues = result.get("issues", [])
+        if issues:
+            print(f"  Post-synthesis check found {len(issues)} issues:")
+            for issue in issues[:5]:
+                print(f"    [{issue.get('type')}] {issue.get('framework')}: {issue.get('detail', '')[:100]}")
+        else:
+            print(f"  Post-synthesis check: no issues found")
+        return issues
+    except Exception as exc:
+        print(f"  Post-synthesis check failed (non-fatal): {exc}")
+        return []
 
 
 def write_jsonl(path: str, rows: list[dict[str, Any]]) -> None:
@@ -1572,10 +1779,23 @@ async def main():
         source_report = json.loads(Path(source_artifacts.report_path).read_text(encoding="utf-8"))
         all_events = read_jsonl(source_artifacts.events_path)
         outline_context = outline_payload["outline_context"]
+        global_outline = outline_payload.get("global_outline", outline_context)
+        character_names = extract_character_names(global_outline)
+
+        # Load source text sample if book file is available
+        source_text_sample = ""
+        book_file = source_report.get("book_file", args.book_file)
+        if book_file and os.path.exists(book_file):
+            with open(book_file, "r", encoding="utf-8") as handle:
+                source_text = handle.read()
+            source_text_sample = build_source_text_sample(source_text)
+
         synthesis_payload = await synthesize_frameworks(
             all_events,
             outline_context,
             framework_prompts=framework_prompts,
+            source_text_sample=source_text_sample,
+            character_names=character_names,
         )
 
         for source_path, destination_path in [
@@ -1588,6 +1808,8 @@ async def main():
         ]:
             copy_artifact_if_present(source_path, destination_path)
 
+        check_issues = await post_synthesis_check(synthesis_payload, outline_context)
+
         with open(artifact_paths.synthesis_path, "w", encoding="utf-8") as handle:
             json.dump(synthesis_payload, handle, indent=2, ensure_ascii=False)
 
@@ -1597,6 +1819,8 @@ async def main():
             synthesis_payload=synthesis_payload,
             elapsed_seconds=time.time() - start_time,
         )
+        if check_issues:
+            report_payload["post_synthesis_issues"] = check_issues
         report_payload["score_only"] = args.score_only
         with open(artifact_paths.report_path, "w", encoding="utf-8") as handle:
             json.dump(report_payload, handle, indent=2, ensure_ascii=False)
@@ -1607,52 +1831,70 @@ async def main():
         text = handle.read()
     validate_source_text(text, args.book_file)
 
-    macro_chunks = [
-        {
-            "start_char": index,
-            "end_char": min(index + MACRO_CHUNK_SIZE, len(text)),
-            "text": text[index : index + MACRO_CHUNK_SIZE],
-        }
-        for index in range(0, len(text), MACRO_CHUNK_SIZE)
-    ]
-    print(f"Loaded {args.book_file}: {len(text):,} characters, {len(macro_chunks)} macro-chunks.")
+    is_short_text = len(text) < SHORT_TEXT_THRESHOLD
+    if is_short_text:
+        print(f"Loaded {args.book_file}: {len(text):,} characters (short text mode).")
+    else:
+        macro_chunks = [
+            {
+                "start_char": index,
+                "end_char": min(index + MACRO_CHUNK_SIZE, len(text)),
+                "text": text[index : index + MACRO_CHUNK_SIZE],
+            }
+            for index in range(0, len(text), MACRO_CHUNK_SIZE)
+        ]
+        print(f"Loaded {args.book_file}: {len(text):,} characters, {len(macro_chunks)} macro-chunks.")
 
     outline_samples = build_outline_samples(text)
     global_outline = await generate_global_outline(outline_samples)
     outline_context = build_outline_context(global_outline)
-    dynamic_keywords = await extract_dynamic_keywords(global_outline)
-    keywords = combine_keywords(dynamic_keywords)
-    print(f"  Keyword set size: {len(keywords)}")
 
-    keyword_embeddings = await embed_many(keywords)
-    keyword_vectors = [
-        (keyword, embedding)
-        for keyword, embedding in zip(keywords, keyword_embeddings)
-        if embedding
-    ]
-    if not keyword_vectors:
-        raise RuntimeError("No keyword embeddings could be generated")
+    if is_short_text:
+        keywords = STATIC_KEYWORDS
+        print(f"  Short text mode: skipping keyword extraction and FAISS retrieval")
+        print(f"\n--- Phase 2: Short Text Direct Extraction ---")
+        short_report = await process_short_text(text, outline_context)
+        chunk_reports = [short_report]
+    else:
+        dynamic_keywords = await extract_dynamic_keywords(global_outline)
+        keywords = combine_keywords(dynamic_keywords)
+        print(f"  Keyword set size: {len(keywords)}")
 
-    print(f"\n--- Phase 2: Parallel Fan-Out Chunk Extraction ({len(macro_chunks)} chunks) ---")
-    chunk_reports = await asyncio.gather(
-        *[
-            process_chunk(
-                chunk_idx + 1,
-                build_micro_chunk_records(macro_chunk["text"], start_char=macro_chunk["start_char"]),
-                keyword_vectors,
-                outline_context,
-                args.book_file,
-            )
-            for chunk_idx, macro_chunk in enumerate(macro_chunks)
+        keyword_embeddings = await embed_many(keywords)
+        keyword_vectors = [
+            (keyword, embedding)
+            for keyword, embedding in zip(keywords, keyword_embeddings)
+            if embedding
         ]
-    )
+        if not keyword_vectors:
+            raise RuntimeError("No keyword embeddings could be generated")
+
+        print(f"\n--- Phase 2: Parallel Fan-Out Chunk Extraction ({len(macro_chunks)} chunks) ---")
+        chunk_reports = await asyncio.gather(
+            *[
+                process_chunk(
+                    chunk_idx + 1,
+                    build_micro_chunk_records(macro_chunk["text"], start_char=macro_chunk["start_char"]),
+                    keyword_vectors,
+                    outline_context,
+                    args.book_file,
+                )
+                for chunk_idx, macro_chunk in enumerate(macro_chunks)
+            ]
+        )
+
     all_events = [event for chunk in chunk_reports for event in chunk["events"]]
     print(f"Phase 2 complete: {len(all_events)} total validated events.")
+
+    source_text_sample = build_source_text_sample(text)
+    character_names = extract_character_names(global_outline)
 
     synthesis_payload = await synthesize_frameworks(
         all_events,
         outline_context,
         framework_prompts=framework_prompts,
+        source_text_sample=source_text_sample,
+        character_names=character_names,
     )
     all_snippets = [snippet for chunk in chunk_reports for snippet in chunk["snippets"]]
     all_characters = [record for chunk in chunk_reports for record in chunk["characters"]]
@@ -1676,6 +1918,8 @@ async def main():
     with open(artifact_paths.outline_path, "w", encoding="utf-8") as handle:
         json.dump(to_json_safe(outline_payload), handle, indent=2, ensure_ascii=False)
 
+    check_issues = await post_synthesis_check(synthesis_payload, outline_context)
+
     write_jsonl(artifact_paths.snippets_path, all_snippets)
     write_jsonl(artifact_paths.characters_path, all_characters)
     write_jsonl(artifact_paths.dialogue_path, all_dialogue)
@@ -1696,6 +1940,8 @@ async def main():
         synthesis_payload,
         time.time() - start_time,
     )
+    if check_issues:
+        report_payload["post_synthesis_issues"] = check_issues
     report_payload["score_only"] = args.score_only
     with open(artifact_paths.report_path, "w", encoding="utf-8") as handle:
         json.dump(report_payload, handle, indent=2, ensure_ascii=False)
