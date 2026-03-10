@@ -16,7 +16,7 @@ from typing import Any
 import faiss
 import numpy as np
 
-NTSMR_VERSION = "2.4"
+NTSMR_VERSION = "2.5"
 CACHE_SCHEMA_VERSION = "substrate-v1"
 MIN_SOURCE_TEXT_CHARS = int(os.environ.get("NTSMR_MIN_SOURCE_TEXT_CHARS", "1500"))
 DEFAULT_GEMINI_MODEL_LABEL = os.environ.get("NTSMR_GEMINI_MODEL_LABEL", "gemini-3.1-pro-preview")
@@ -107,15 +107,15 @@ FRAMEWORK_SYNTHESIS_PROMPTS = {
     },
     "Quadrant Scores": {
         "filter_tag": None,
-        "prompt_suffix": """Output exactly 6 floats between 0.0 and 1.0 for these metrics based on the timeline's pacing, conflict types, and plot structure:\n- time_linearity: 0.0=Non-linear/fragmented timeline, 1.0=Strictly chronological\n- pacing_velocity: 0.0=Slow/contemplative, 1.0=Fast/action-driven\n- threat_scale: 0.0=Personal/intimate stakes, 1.0=Cosmic/civilizational stakes\n- protagonist_fate: 0.0=Tragic/defeated, 1.0=Triumphant/vindicated\n- conflict_style: 0.0=Internal/psychological, 1.0=External/physical\n- price_type: 0.0=Abstract/spiritual cost, 1.0=Concrete/material cost\n\nCalibration anchors (use these as reference points):\n- time_linearity: Slaughterhouse-Five ~0.15 (highly fragmented), Blindsight ~0.65 (mostly linear with frame), Old Man's War ~0.90 (straightforward chronology)\n- pacing_velocity: Solaris ~0.20 (slow philosophical), Neuromancer ~0.75 (fast cyberpunk), Ender's Game ~0.85 (action-driven)\n- threat_scale: Flowers for Algernon ~0.10 (deeply personal), Neuromancer ~0.50 (mixed), Three-Body Problem ~0.95 (civilizational extinction)\n- protagonist_fate: 1984 ~0.10 (total defeat), Blindsight ~0.30 (ambiguous/dark), Ender's Game ~0.70 (victory with cost)\n- conflict_style: Solaris ~0.15 (internal/philosophical), Left Hand of Darkness ~0.40 (mixed cultural), Ender's Game ~0.85 (combat-driven)\n- price_type: Solaris ~0.15 (existential/spiritual), Ender's Game ~0.60 (mixed moral+physical), Old Man's War ~0.90 (bodily/material)\n\nScoring guidance:\n- Scores of exactly 0.0 or 1.0 are reserved for absolute extremes. Most works should score between 0.10 and 0.90.\n- Score the dominant narrative logic of the whole work, not just the loudest climax.\n- For time_linearity, a mostly chronological narrative with minor flashbacks should score 0.7-0.85, not be pulled to the extremes.\n- For pacing_velocity, assess the overall tempo. A contemplative novel with a few action scenes is still slow-paced.\n- For threat_scale, institutions, class systems, biopolitical sorting, and civilizational stakes push upward. Personal stakes push downward.\n- For conflict_style, ask whether meaning is driven mainly by external combat/opposition (high) or by internal revelation, juxtaposition, and perspective shift (low).\n- For price_type, bodily harm, material destruction, and concrete losses push upward. Identity, autonomy, belief, memory, and relational costs push downward.\n\nThe analysis object must be:\n{\n  \"time_linearity\": 0.0,\n  \"pacing_velocity\": 0.0,\n  \"threat_scale\": 0.0,\n  \"protagonist_fate\": 0.0,\n  \"conflict_style\": 0.0,\n  \"price_type\": 0.0\n}""",
+        "prompt_suffix": """Output exactly 6 floats between 0.0 and 1.0 for these metrics based on the timeline's pacing, conflict types, and plot structure:\n- time_linearity: 0.0=Non-linear/fragmented timeline, 1.0=Strictly chronological\n- pacing_velocity: 0.0=Slow/contemplative, 1.0=Fast/action-driven\n- threat_scale: 0.0=Personal/intimate stakes, 1.0=Cosmic/civilizational stakes\n- protagonist_fate: 0.0=Tragic/defeated, 1.0=Triumphant/vindicated\n- conflict_style: 0.0=Internal/psychological, 1.0=External/physical\n- price_type: 0.0=Abstract/spiritual cost, 1.0=Concrete/material cost\n\nCalibration anchors (use these as reference points):\n- time_linearity: Slaughterhouse-Five ~0.15 (highly fragmented), Blindsight ~0.65 (mostly linear with frame), Old Man's War ~0.90 (straightforward chronology)\n- pacing_velocity: Solaris ~0.20 (slow philosophical), Left Hand of Darkness ~0.30 (deliberate ethnographic), Neuromancer ~0.75 (fast cyberpunk), Ender's Game ~0.85 (action-driven). NOTE: Contemplative and literary SF typically scores 0.20-0.40 — do not inflate pacing for occasional action scenes.\n- threat_scale: Flowers for Algernon ~0.10 (deeply personal), Neuromancer ~0.50 (mixed), Three-Body Problem ~0.95 (civilizational extinction)\n- protagonist_fate: 1984 ~0.10 (total defeat), Blindsight ~0.30 (ambiguous/dark), Ender's Game ~0.70 (victory with cost)\n- conflict_style: Solaris ~0.15 (purely internal/philosophical), Flowers for Algernon ~0.20 (internal journey), Left Hand of Darkness ~0.40 (mixed cultural), Dune ~0.55 (balanced political+physical), Ender's Game ~0.85 (combat-driven). NOTE: Many literary SF works score 0.20-0.45 — do not over-estimate external conflict.\n- price_type: Solaris ~0.15 (existential/spiritual), Flowers for Algernon ~0.20 (loss of self/identity), Blindsight ~0.35 (consciousness/autonomy), Ender's Game ~0.60 (mixed moral+physical), Old Man's War ~0.90 (bodily/material). NOTE: Identity loss, belief erosion, and relational costs are abstract — score them 0.15-0.40, not 0.50+.\n\nScoring guidance:\n- Scores of exactly 0.0 or 1.0 are reserved for absolute extremes. Most works should score between 0.10 and 0.90.\n- Score the dominant narrative logic of the whole work, not just the loudest climax.\n- For time_linearity, a mostly chronological narrative with minor flashbacks should score 0.7-0.85, not be pulled to the extremes.\n- For pacing_velocity, assess the overall tempo. A contemplative novel with a few action scenes is still slow-paced.\n- For threat_scale, institutions, class systems, biopolitical sorting, and civilizational stakes push upward. Personal stakes push downward.\n- For conflict_style, ask whether meaning is driven mainly by external combat/opposition (high) or by internal revelation, juxtaposition, and perspective shift (low).\n- For price_type, bodily harm, material destruction, and concrete losses push upward. Identity, autonomy, belief, memory, and relational costs push downward.\n\nThe analysis object must be:\n{\n  \"time_linearity\": 0.0,\n  \"pacing_velocity\": 0.0,\n  \"threat_scale\": 0.0,\n  \"protagonist_fate\": 0.0,\n  \"conflict_style\": 0.0,\n  \"price_type\": 0.0\n}""",
     },
     "The Freytag Pyramid": {
         "filter_tag": "freytag",
-        "prompt_suffix": """Map the narrative arc to Freytag's five dramatic stages.\n\nThe analysis object must be:\n{\n  \"exposition\": \"Setup of world, characters, initial situation\",\n  \"rising_action\": \"Key complications and escalation toward the turning point\",\n  \"climax\": \"The decisive turning point or moment of highest tension\",\n  \"falling_action\": \"Consequences and unwinding after the climax\",\n  \"denouement\": \"Final resolution and the new state of affairs\"\n}""",
+        "prompt_suffix": """Map the narrative arc to Freytag's five dramatic stages. The five phases must be sequential: exposition → rising action → climax → falling action → denouement. Anchor each phase to specific events from the provided event timeline. Do not reference plot events that are not in the event list.\n\nThe analysis object must be:\n{\n  \"exposition\": \"Setup of world, characters, initial situation\",\n  \"rising_action\": \"Key complications and escalation toward the turning point\",\n  \"climax\": \"The decisive turning point or moment of highest tension\",\n  \"falling_action\": \"Consequences and unwinding after the climax\",\n  \"denouement\": \"Final resolution and the new state of affairs\"\n}""",
     },
     "The Three-Act Structure": {
         "filter_tag": "three_act",
-        "prompt_suffix": """Map the narrative to the three-act structure, identifying the two key plot points.\n\nThe analysis object must be:\n{\n  \"act_1_setup\": \"The world, characters, and status quo before the inciting incident\",\n  \"plot_point_1\": \"The event that launches the protagonist into the central conflict\",\n  \"act_2_confrontation\": \"The escalating obstacles, complications, and midpoint reversal\",\n  \"plot_point_2\": \"The crisis that forces the final confrontation\",\n  \"act_3_resolution\": \"The climax and its aftermath\"\n}""",
+        "prompt_suffix": """Map the narrative to the three-act structure, identifying the two key plot points. Each act boundary must correspond to a specific event from the provided event list. Do not import plot points from other works — only reference events that appear in the source material.\n\nThe analysis object must be:\n{\n  \"act_1_setup\": \"The world, characters, and status quo before the inciting incident\",\n  \"plot_point_1\": \"The event that launches the protagonist into the central conflict\",\n  \"act_2_confrontation\": \"The escalating obstacles, complications, and midpoint reversal\",\n  \"plot_point_2\": \"The crisis that forces the final confrontation\",\n  \"act_3_resolution\": \"The climax and its aftermath\"\n}""",
     },
     "The Monomyth": {
         "filter_tag": "monomyth",
@@ -163,11 +163,13 @@ FRAMEWORK_SYNTHESIS_PROMPTS = {
     },
     "Jungian Archetypal Analysis": {
         "filter_tag": "jung",
-        "prompt_suffix": """Identify the Jungian archetypes present in the narrative.\n\nThe analysis object must be:\n{\n  \"persona\": \"The public mask or social role characters present\",\n  \"shadow\": \"The repressed, dark, or denied aspects\",\n  \"anima_animus\": \"The contrasexual inner figure\",\n  \"trickster\": \"The agent of chaos, boundary-crossing, or transformation\"\n}""",
+        "prompt_suffix": """Identify the Jungian archetypes present in the narrative.
+
+Valid archetypes: Persona, Shadow, Anima/Animus, Self, Trickster, Wise Old Man/Woman, Child, Mother, Father. Do not assign archetypes outside this list. Each archetype assignment must cite a specific scene or event from the provided material.\n\nThe analysis object must be:\n{\n  \"persona\": \"The public mask or social role characters present\",\n  \"shadow\": \"The repressed, dark, or denied aspects\",\n  \"anima_animus\": \"The contrasexual inner figure\",\n  \"trickster\": \"The agent of chaos, boundary-crossing, or transformation\"\n}""",
     },
     "Genette's Transtextuality": {
         "filter_tag": "transtextuality",
-        "prompt_suffix": """Analyze the transtextual relationships -- how this text relates to other texts.\n\nThe analysis object must be:\n{\n  \"intertextuality\": \"Direct quotations, allusions, or references to other works\",\n  \"paratextuality\": \"How titles, epigraphs, prefaces, or cover art frame meaning\",\n  \"metatextuality\": \"How the text comments on or critiques other texts or its own genre\"\n}""",
+        "prompt_suffix": """Analyze the transtextual relationships -- how this text relates to other texts. Only claim intertextual connections that are explicitly mentioned, quoted, or clearly alluded to in the provided text snippets. Do not infer connections based on genre conventions alone. If no clear intertextual references exist in the source material, state this explicitly rather than fabricating connections.\n\nThe analysis object must be:\n{\n  \"intertextuality\": \"Direct quotations, allusions, or references to other works\",\n  \"paratextuality\": \"How titles, epigraphs, prefaces, or cover art frame meaning\",\n  \"metatextuality\": \"How the text comments on or critiques other texts or its own genre\"\n}""",
     },
 }
 
@@ -614,10 +616,11 @@ def normalize_signal(signal: str) -> str:
     return signal.strip().lower()
 
 
-def validate_signal(signal: str) -> str:
+def validate_signal(signal: str) -> str | None:
     normalized = normalize_signal(signal)
     if normalized not in ALLOWED_SIGNALS:
-        raise ValueError(f"Unknown framework signal: {signal}")
+        print(f"    [WARN] Skipping unknown framework signal: {signal}")
+        return None
     return normalized
 
 
@@ -672,7 +675,11 @@ def validate_event(event: dict[str, Any], allowed_snippet_ids: set[str]) -> dict
     if not isinstance(framework_signals, list):
         raise ValueError("framework_signals must be a list")
 
-    validated_signals = ordered_dedupe([validate_signal(signal) for signal in framework_signals])
+    raw_signals = [validate_signal(signal) for signal in framework_signals]
+    n_invalid = sum(1 for s in raw_signals if s is None)
+    validated_signals = ordered_dedupe([s for s in raw_signals if s is not None])
+    if n_invalid > 0:
+        print(f"    [WARN] Event {event_id.strip()}: {n_invalid}/{len(framework_signals)} invalid signals removed")
     return {
         "event_id": event_id.strip(),
         "chunk_id": chunk_id.strip(),
@@ -841,7 +848,10 @@ def parse_extraction_output(output: str, chunk_id: str, allowed_snippet_ids: set
         normalized = dict(raw_event)
         normalized["event_id"] = f"{chunk_id}-ev-{index}"
         normalized["chunk_id"] = chunk_id
-        events.append(validate_event(normalized, allowed_snippet_ids))
+        try:
+            events.append(validate_event(normalized, allowed_snippet_ids))
+        except ValueError as exc:
+            print(f"    [WARN] Skipping malformed event {chunk_id}-ev-{index}: {exc}")
 
     if len(events) < MIN_EVENTS_PER_CHUNK:
         raise ValueError(f"Expected at least {MIN_EVENTS_PER_CHUNK} events for {chunk_id}, got {len(events)}")
@@ -1247,7 +1257,12 @@ def load_or_build_index(book_file: str, chunk_id: str, micro_chunks: list[dict[s
         try:
             index = faiss.read_index(faiss_path)
             with open(chunks_path, "r", encoding="utf-8") as handle:
-                cached_chunks = normalize_cached_micro_chunks(json.load(handle))
+                raw_cache = json.load(handle)
+            # Handle both old format (plain list) and new format (dict with source_file)
+            if isinstance(raw_cache, dict) and "chunks" in raw_cache:
+                cached_chunks = normalize_cached_micro_chunks(raw_cache["chunks"])
+            else:
+                cached_chunks = normalize_cached_micro_chunks(raw_cache)
             return index, cached_chunks, faiss_path
         except Exception:
             pass
@@ -1274,8 +1289,9 @@ async def build_faiss_index(book_file: str, chunk_id: str, micro_chunks: list[di
     faiss_path = f"{cache_base}.faiss"
     chunks_path = f"{cache_base}.chunks.json"
     faiss.write_index(index, faiss_path)
+    cache_data = {"source_file": os.path.basename(book_file), "chunks": list(valid_micro_chunks)}
     with open(chunks_path, "w", encoding="utf-8") as handle:
-        json.dump(list(valid_micro_chunks), handle, ensure_ascii=False)
+        json.dump(cache_data, handle, ensure_ascii=False)
     return index, list(valid_micro_chunks), faiss_path, False
 
 
@@ -1487,9 +1503,11 @@ async def synthesize_single_framework(
         character_section = ""
         if character_names:
             names_list = ", ".join(character_names[:50])
-            character_section = f"\n## VERIFIED CHARACTER NAMES\nOnly use these character names: {names_list}\n"
+            character_section = f"\n## VERIFIED CHARACTER NAMES\nOnly use these character names: {names_list}\nDo not reference characters not in this list. If unsure of a name, describe the character's role instead.\n"
 
         prompt = f"""You are a Synthesis Sub-Agent specializing in {framework_name}.
+
+IMPORTANT: This analysis is ONLY about the work described in the CHARACTER REFERENCE below. Do not reference events, characters, themes, or plot points from any other work. All claims must be grounded in the provided source text snippets and event timeline.
 
 ## CHARACTER REFERENCE
 {outline_context}
@@ -1508,7 +1526,9 @@ Output a single JSON object with exactly these keys:
 Rules:
 - evidence_event_ids must contain 1-8 event IDs copied exactly from the timeline above.
 - confidence: 1.0 = highly confident with strong textual evidence, 0.5 = moderate confidence, 0.0 = speculative.
-- Only use character names that appear in the CHARACTER REFERENCE or VERIFIED CHARACTER NAMES sections.
+- Only use character names that appear in the CHARACTER REFERENCE or VERIFIED CHARACTER NAMES sections. If unsure of a name, describe the character's role instead.
+- Only use direct quotes that appear verbatim in the provided snippets or event timeline. If you cannot find the exact wording, paraphrase without quotation marks.
+- Anchor each claim to specific events or scenes from the provided material. Do not reference plot events that are not in the event list.
 - The analysis value must match this schema:
 {framework_config['prompt_suffix']}
 - Output JSON only. No markdown. No prose.
@@ -1525,6 +1545,28 @@ Rules:
 
         validated["used_full_timeline_fallback"] = used_fallback
         validated["event_count"] = len(selected_events)
+
+        # Post-synthesis name check: log unknown names (exact match only)
+        if character_names:
+            analysis_text = json.dumps(validated.get("analysis", {}), ensure_ascii=False)
+            names_set = set(character_names)
+            for name in names_set:
+                # Skip very short names that would false-positive
+                if len(name) < 3:
+                    continue
+            # Check for capitalized words in analysis that might be character names
+            words_in_analysis = set(re.findall(r'\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]+)*\b', analysis_text))
+            unknown_names = [w for w in words_in_analysis if w not in names_set and len(w) > 3]
+            # Filter out common framework terms
+            framework_terms = {"Hero", "Shadow", "Trickster", "Self", "Journey", "Quest", "Act", "Setup",
+                             "Climax", "Resolution", "Rising", "Falling", "Action", "Exposition", "Return",
+                             "Departure", "Threshold", "Ordeal", "Change", "Need", "Find", "Take",
+                             "Image", "Catalyst", "Debate", "Midpoint", "Finale", "Introduction",
+                             "Development", "Twist", "Conclusion", "Description", "None", "True", "False"}
+            unknown_names = [n for n in unknown_names if n not in framework_terms]
+            if unknown_names:
+                print(f"    [WARN] {framework_name}: possible unknown names: {', '.join(unknown_names[:5])}")
+
         return framework_name, validated
 
 
@@ -1549,35 +1591,49 @@ async def synthesize_frameworks(
     return {framework_name: payload for framework_name, payload in pairs}
 
 
-POST_SYNTHESIS_CHECK_PROMPT = """You are a quality-control agent. Given a character outline and a set of framework analyses, flag any issues.
+POST_SYNTHESIS_CHECK_PROMPT = """You are a quality-control agent. Given a character outline, source text snippets, and a set of framework analyses, verify factual accuracy.
 
 ## CHARACTER OUTLINE
 {outline_context}
+
+## VERIFIED CHARACTER NAMES
+{character_names_section}
+
+## SOURCE TEXT SNIPPETS (for verification)
+{source_snippets_section}
 
 ## FRAMEWORK ANALYSES
 {synthesis_summary}
 
 Check for:
-1. Character names used in analyses that do NOT appear in the outline
+1. Character names used in analyses that do NOT appear in the outline or VERIFIED CHARACTER NAMES
 2. Plot events described in analyses that contradict the outline's plot summary
-3. Any claims that seem fabricated or unsupported by the outline
+3. Direct quotes that do not appear verbatim in the source text snippets
+4. Any claims that seem fabricated or unsupported by the outline and source text
+5. References to events, characters, or themes from other works
 
 Output a JSON object:
 {{
+  "quotes_verified": true or false,
+  "characters_match_source": true or false,
+  "no_external_references": true or false,
+  "framework_terms_valid": true or false,
   "issues": [
-    {{"framework": "<name>", "type": "wrong_name|contradiction|unsupported", "detail": "<description>"}}
+    {{"framework": "<name>", "type": "wrong_name|contradiction|unsupported|misquote|external_reference", "detail": "<description>"}}
   ]
 }}
 
-If no issues found, return {{"issues": []}}.
+If no issues found, return {{"quotes_verified": true, "characters_match_source": true, "no_external_references": true, "framework_terms_valid": true, "issues": []}}.
 Output JSON only."""
 
 
 async def post_synthesis_check(
     synthesis_payload: dict[str, dict[str, Any]],
     outline_context: str,
+    snippets: list[dict[str, Any]] | None = None,
+    character_names: list[str] | None = None,
 ) -> list[dict[str, str]]:
-    """Run a lightweight self-check on synthesis results."""
+    """Run a structured self-check on synthesis results with source text grounding."""
     summary_parts = []
     for fw_name, fw_data in synthesis_payload.items():
         analysis = fw_data.get("analysis", {})
@@ -1588,16 +1644,34 @@ async def post_synthesis_check(
     if len(synthesis_payload) <= 1:
         return []
 
+    # Build source snippets section (first 20, truncated)
+    source_snippets_section = "None provided."
+    if snippets:
+        snippet_parts = []
+        for s in snippets[:20]:
+            text = s.get("text", "")[:500]
+            snippet_parts.append(f"[{s.get('snippet_id', '?')}] {text}")
+        source_snippets_section = "\n".join(snippet_parts)
+
+    # Build character names section
+    character_names_section = "None provided."
+    if character_names:
+        character_names_section = ", ".join(character_names[:50])
+
     prompt = POST_SYNTHESIS_CHECK_PROMPT.format(
         outline_context=outline_context,
         synthesis_summary=synthesis_summary[:8000],
+        source_snippets_section=source_snippets_section[:10000],
+        character_names_section=character_names_section,
     )
     try:
         output = await run_llm_cli(prompt, retries=1)
         result = extract_first_json_value(output)
         issues = result.get("issues", [])
+        checks = {k: result.get(k) for k in ("quotes_verified", "characters_match_source", "no_external_references", "framework_terms_valid") if k in result}
+        failed_checks = [k for k, v in checks.items() if v is False]
         if issues:
-            print(f"  Post-synthesis check found {len(issues)} issues:")
+            print(f"  Post-synthesis check found {len(issues)} issues (failed: {', '.join(failed_checks) or 'none'}):")
             for issue in issues[:5]:
                 print(f"    [{issue.get('type')}] {issue.get('framework')}: {issue.get('detail', '')[:100]}")
         else:
@@ -1808,7 +1882,11 @@ async def main():
         ]:
             copy_artifact_if_present(source_path, destination_path)
 
-        check_issues = await post_synthesis_check(synthesis_payload, outline_context)
+        # Load snippets from reused artifacts for self-check grounding
+        reuse_snippets = []
+        if os.path.exists(source_artifacts.snippets_path):
+            reuse_snippets = read_jsonl(source_artifacts.snippets_path)
+        check_issues = await post_synthesis_check(synthesis_payload, outline_context, snippets=reuse_snippets, character_names=character_names)
 
         with open(artifact_paths.synthesis_path, "w", encoding="utf-8") as handle:
             json.dump(synthesis_payload, handle, indent=2, ensure_ascii=False)
@@ -1918,7 +1996,7 @@ async def main():
     with open(artifact_paths.outline_path, "w", encoding="utf-8") as handle:
         json.dump(to_json_safe(outline_payload), handle, indent=2, ensure_ascii=False)
 
-    check_issues = await post_synthesis_check(synthesis_payload, outline_context)
+    check_issues = await post_synthesis_check(synthesis_payload, outline_context, snippets=all_snippets, character_names=character_names)
 
     write_jsonl(artifact_paths.snippets_path, all_snippets)
     write_jsonl(artifact_paths.characters_path, all_characters)
