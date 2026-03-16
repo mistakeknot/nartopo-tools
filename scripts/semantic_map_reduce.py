@@ -1260,8 +1260,15 @@ def load_or_build_index(book_file: str, chunk_id: str, micro_chunks: list[dict[s
                 raw_cache = json.load(handle)
             # Handle both old format (plain list) and new format (dict with source_file)
             if isinstance(raw_cache, dict) and "chunks" in raw_cache:
+                # Verify source file matches expected book (contamination detection)
+                cached_source = raw_cache.get("source_file")
+                expected_source = os.path.basename(book_file)
+                if cached_source and cached_source != expected_source:
+                    print(f"    [WARN] Cache source mismatch for {chunk_id}: cached={cached_source}, expected={expected_source} — rebuilding index")
+                    return None, None, faiss_path
                 cached_chunks = normalize_cached_micro_chunks(raw_cache["chunks"])
             else:
+                # Old format without source_file — accept but can't verify
                 cached_chunks = normalize_cached_micro_chunks(raw_cache)
             return index, cached_chunks, faiss_path
         except Exception:
