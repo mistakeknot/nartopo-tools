@@ -13,10 +13,58 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import threading
+
 import faiss
 import numpy as np
 
 NTSMR_VERSION = "2.5"
+
+
+class TokenAccumulator:
+    """Thread-safe accumulator for LLM token usage across a pipeline run."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.reset()
+
+    def reset(self):
+        with self._lock if hasattr(self, "_lock") else _noop_ctx():
+            self.input_tokens = 0
+            self.output_tokens = 0
+            self.cache_creation_tokens = 0
+            self.cache_read_tokens = 0
+            self.total_cost_usd = 0.0
+            self.llm_calls = 0
+
+    def add(self, input_tok: int = 0, output_tok: int = 0, cache_creation: int = 0,
+            cache_read: int = 0, cost_usd: float = 0.0):
+        with self._lock:
+            self.input_tokens += input_tok
+            self.output_tokens += output_tok
+            self.cache_creation_tokens += cache_creation
+            self.cache_read_tokens += cache_read
+            self.total_cost_usd += cost_usd
+            self.llm_calls += 1
+
+    def snapshot(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "input_tokens": self.input_tokens,
+                "output_tokens": self.output_tokens,
+                "cache_creation_tokens": self.cache_creation_tokens,
+                "cache_read_tokens": self.cache_read_tokens,
+                "total_cost_usd": round(self.total_cost_usd, 6),
+                "llm_calls": self.llm_calls,
+            }
+
+
+class _noop_ctx:
+    def __enter__(self): return self
+    def __exit__(self, *a): pass
+
+
+TOKEN_USAGE = TokenAccumulator()
 CACHE_SCHEMA_VERSION = "substrate-v1"
 MIN_SOURCE_TEXT_CHARS = int(os.environ.get("NTSMR_MIN_SOURCE_TEXT_CHARS", "1500"))
 DEFAULT_GEMINI_MODEL_LABEL = os.environ.get("NTSMR_GEMINI_MODEL_LABEL", "gemini-3.1-pro-preview")
@@ -1100,6 +1148,7 @@ async def run_claude_cli(
             "--no-session-persistence",
             "--dangerously-skip-permissions",
             "--tools", "",
+            "--output-format", "json",
         ]
         if config.reasoning_effort:
             command.extend(["--effort", config.reasoning_effort])
@@ -1121,7 +1170,21 @@ async def run_claude_cli(
             last_error = TimeoutError(f"claude timed out after {timeout}s")
         else:
             if process.returncode == 0 and stdout:
-                return stdout.decode("utf-8", errors="replace")
+                raw = stdout.decode("utf-8", errors="replace")
+                try:
+                    envelope = json.loads(raw)
+                    result_text = envelope.get("result", raw)
+                    usage = envelope.get("usage", {})
+                    TOKEN_USAGE.add(
+                        input_tok=usage.get("input_tokens", 0),
+                        output_tok=usage.get("output_tokens", 0),
+                        cache_creation=usage.get("cache_creation_input_tokens", 0),
+                        cache_read=usage.get("cache_read_input_tokens", 0),
+                        cost_usd=float(envelope.get("total_cost_usd", 0)),
+                    )
+                    return result_text
+                except (json.JSONDecodeError, KeyError):
+                    return raw
             stderr_text = stderr.decode("utf-8", errors="replace").strip()
             stdout_text = stdout.decode("utf-8", errors="replace").strip()
             last_error = RuntimeError(
@@ -1781,6 +1844,7 @@ def build_report(
             for chunk in chunk_reports
         ],
         "elapsed_seconds": round(elapsed_seconds, 2),
+        "token_usage": TOKEN_USAGE.snapshot(),
     })
 
 
@@ -1802,6 +1866,7 @@ def build_reused_report(
     report["artifacts"] = artifact_paths.__dict__
     report["frameworks"] = framework_summary(synthesis_payload)
     report["elapsed_seconds"] = round(elapsed_seconds, 2)
+    report["token_usage"] = TOKEN_USAGE.snapshot()
     report["source_run_label"] = source_report.get("ntsmr_run_label")
     report["source_artifacts"] = source_report.get("artifacts")
     return to_json_safe(report)
@@ -1833,6 +1898,7 @@ async def main():
         run_label=args.run_label,
     )
 
+    TOKEN_USAGE.reset()
     start_time = time.time()
     print(
         f"LLM backend: {ACTIVE_LLM_CONFIG.backend}, model: {ACTIVE_LLM_CONFIG.model}, "
@@ -1909,7 +1975,10 @@ async def main():
         report_payload["score_only"] = args.score_only
         with open(artifact_paths.report_path, "w", encoding="utf-8") as handle:
             json.dump(report_payload, handle, indent=2, ensure_ascii=False)
+        usage = TOKEN_USAGE.snapshot()
         print(f"Reused artifacts from {args.reuse_from}; synthesized {len(synthesis_payload)} frameworks.")
+        if usage["llm_calls"] > 0:
+            print(f"Token usage: {usage['input_tokens']:,} in + {usage['output_tokens']:,} out — ${usage['total_cost_usd']:.4f}")
         return
 
     with open(args.book_file, "r", encoding="utf-8") as handle:
@@ -2031,7 +2100,12 @@ async def main():
     with open(artifact_paths.report_path, "w", encoding="utf-8") as handle:
         json.dump(report_payload, handle, indent=2, ensure_ascii=False)
 
+    usage = TOKEN_USAGE.snapshot()
     print(f"\nDone! Pipeline completed in {time.time() - start_time:.2f} seconds.")
+    if usage["llm_calls"] > 0:
+        print(f"Token usage: {usage['input_tokens']:,} in + {usage['output_tokens']:,} out "
+              f"({usage['cache_creation_tokens']:,} cache-create, {usage['cache_read_tokens']:,} cache-read) "
+              f"across {usage['llm_calls']} LLM calls — ${usage['total_cost_usd']:.4f}")
     print(f"Outline: {artifact_paths.outline_path}")
     print(f"Snippets: {artifact_paths.snippets_path}")
     print(f"Characters: {artifact_paths.characters_path}")
