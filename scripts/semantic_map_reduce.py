@@ -1472,6 +1472,87 @@ async def extract_substrate_for_chunk(
         return parse_substrate_output(repair_output, chunk_id, allowed_snippet_ids)
 
 
+async def extract_events_and_substrate_for_chunk(
+    chunk_id: str,
+    snippets: list[dict[str, Any]],
+    outline_context: str,
+) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+    """Merged events + substrate extraction in a single LLM call to save per-call overhead."""
+    prompt = f"""You are a structural analysis sub-agent analyzing {chunk_id}.
+
+Here is the GLOBAL OUTLINE CONTEXT of the novel:
+{outline_context}
+
+Here are retrieved snippets from your specific chunk. Each snippet has a stable snippet ID:
+{render_snippets(snippets)}
+
+You have TWO tasks. Output both sections in order.
+
+## TASK 1: STRUCTURAL EVENTS
+Extract the major structural beats from these snippets as strict JSON Lines (JSONL).
+Do not hallucinate events outside these snippets. Use the outline only for identity and continuity.
+
+Each JSON line must match this schema:
+{{"snippet_ids": ["{chunk_id}-s1"], "type": "action|dialogue|exposition|bureaucracy", "framework_signals": ["todorov:disruption"], "summary": "Brief 1-sentence summary"}}
+
+Rules:
+- snippet_ids must contain 1-3 IDs from the retrieved snippets above.
+- framework_signals must only use this vocabulary:
+{SIGNAL_VOCABULARY_TEXT}
+- Include 1-5 relevant framework_signals per event when applicable.
+
+## TASK 2: NARRATIVE SUBSTRATE
+Extract reusable narrative substrate records as a single JSON object with keys "characters", "dialogue_turns", "settings".
+
+Characters schema: {{"snippet_ids": ["{chunk_id}-s1"], "name": "Name", "aliases": [], "role": "Role", "summary": "Brief description"}}
+Dialogue schema: {{"snippet_ids": ["{chunk_id}-s2"], "speaker": "Name", "addressee": "Name or unknown", "speech_act": "command|confession|debate|exposition|revelation|request|threat|warning|other", "summary": "Brief summary"}}
+Settings schema: {{"snippet_ids": ["{chunk_id}-s3"], "location": "Place", "time_marker": "When", "social_context": "Context", "summary": "Brief description"}}
+
+Rules for both tasks:
+- Use only the provided snippet_ids. Do not invent names, locations, or events absent from the snippets.
+- No markdown code fences. No prose outside the data sections.
+
+Format your response EXACTLY like this:
+## JSONL
+{{"snippet_ids": ["..."], "type": "...", "framework_signals": ["..."], "summary": "..."}}
+{{"snippet_ids": ["..."], "type": "...", "framework_signals": ["..."], "summary": "..."}}
+
+## SUBSTRATE
+{{"characters": [...], "dialogue_turns": [...], "settings": [...]}}
+"""
+
+    allowed_snippet_ids = {snippet["snippet_id"] for snippet in snippets}
+    output = await run_llm_cli(prompt)
+
+    # Split output into events section and substrate section
+    events = None
+    substrate = None
+
+    # Try to parse the combined output
+    parts = output.split("## SUBSTRATE")
+    if len(parts) >= 2:
+        events_section = parts[0]
+        substrate_section = parts[1]
+        try:
+            events = parse_extraction_output(events_section, chunk_id, allowed_snippet_ids)
+        except Exception:
+            pass
+        try:
+            substrate = parse_substrate_output(substrate_section, chunk_id, allowed_snippet_ids)
+        except Exception:
+            pass
+
+    # Fall back to individual calls for whichever part failed
+    if events is None:
+        print(f"  [{chunk_id}] Merged events parse failed, falling back to individual call")
+        events = await extract_events_for_chunk(chunk_id, snippets, outline_context)
+    if substrate is None:
+        print(f"  [{chunk_id}] Merged substrate parse failed, falling back to individual call")
+        substrate = await extract_substrate_for_chunk(chunk_id, snippets, outline_context)
+
+    return events, substrate
+
+
 async def process_short_text(
     text: str,
     outline_context: str,
@@ -1495,8 +1576,7 @@ async def process_short_text(
             "score": 1.0,
             "text": chunk_text,
         })
-    events = await extract_events_for_chunk(chunk_id, snippets, outline_context)
-    substrate = await extract_substrate_for_chunk(chunk_id, snippets, outline_context)
+    events, substrate = await extract_events_and_substrate_for_chunk(chunk_id, snippets, outline_context)
     print(f"[short-text] Extracted {len(events)} events from {len(snippets)} snippets")
     return {
         "chunk_id": chunk_id,
@@ -1533,8 +1613,7 @@ async def process_chunk(
         )
 
         snippets = select_snippets_for_chunk(chunk_id, valid_micro_chunks, index, keyword_vectors)
-        events = await extract_events_for_chunk(chunk_id, snippets, outline_context)
-        substrate = await extract_substrate_for_chunk(chunk_id, snippets, outline_context)
+        events, substrate = await extract_events_and_substrate_for_chunk(chunk_id, snippets, outline_context)
         print(f"[{chunk_id}] Extracted {len(events)} validated events")
         return {
             "chunk_id": chunk_id,
@@ -1649,16 +1728,23 @@ async def synthesize_frameworks(
 ) -> dict[str, dict[str, Any]]:
     framework_prompts = framework_prompts or FRAMEWORK_SYNTHESIS_PROMPTS
     print(f"\n--- Phase 3: Synthesizing {len(framework_prompts)} frameworks ---")
-    tasks = [
-        synthesize_single_framework(
-            framework_name, config, events, outline_context,
-            source_text_sample=source_text_sample,
-            character_names=character_names,
-        )
-        for framework_name, config in framework_prompts.items()
-    ]
+    async def _safe_synthesize(fw_name, config):
+        try:
+            return await synthesize_single_framework(
+                fw_name, config, events, outline_context,
+                source_text_sample=source_text_sample,
+                character_names=character_names,
+            )
+        except Exception as exc:
+            print(f"  [ERROR] {fw_name} synthesis failed: {exc}")
+            return fw_name, None
+
+    tasks = [_safe_synthesize(fw_name, config) for fw_name, config in framework_prompts.items()]
     pairs = await asyncio.gather(*tasks)
-    return {framework_name: payload for framework_name, payload in pairs}
+    failed = [name for name, payload in pairs if payload is None]
+    if failed:
+        print(f"  WARNING: {len(failed)} framework(s) failed: {', '.join(failed)}")
+    return {name: payload for name, payload in pairs if payload is not None}
 
 
 POST_SYNTHESIS_CHECK_PROMPT = """You are a quality-control agent. Given a character outline, source text snippets, and a set of framework analyses, verify factual accuracy.
@@ -1782,9 +1868,19 @@ def framework_summary(synthesis_payload: dict[str, dict[str, Any]]) -> dict[str,
     }
 
 
-def select_framework_prompts(score_only: bool = False) -> dict[str, dict[str, Any]]:
+def select_framework_prompts(score_only: bool = False, framework_filter: list[str] | None = None) -> dict[str, dict[str, Any]]:
     if score_only:
         return {"Quadrant Scores": FRAMEWORK_SYNTHESIS_PROMPTS["Quadrant Scores"]}
+    if framework_filter:
+        selected = {}
+        for name in framework_filter:
+            if name in FRAMEWORK_SYNTHESIS_PROMPTS:
+                selected[name] = FRAMEWORK_SYNTHESIS_PROMPTS[name]
+            else:
+                print(f"  Warning: unknown framework '{name}', skipping")
+        if not selected:
+            raise ValueError(f"No valid frameworks in filter: {framework_filter}")
+        return selected
     return FRAMEWORK_SYNTHESIS_PROMPTS
 
 
@@ -1888,6 +1984,7 @@ async def main():
     parser.add_argument("--run-label", default=None)
     parser.add_argument("--reuse-from", default=None, help="Reuse existing outline/events artifacts and rerun synthesis only")
     parser.add_argument("--score-only", action="store_true", help="Only synthesize the Quadrant Scores block")
+    parser.add_argument("--frameworks", type=str, default=None, help="Comma-separated list of framework names to synthesize (e.g., 'Quadrant Scores,Todorov')")
     args = parser.parse_args()
 
     global ACTIVE_LLM_CONFIG
@@ -1905,7 +2002,8 @@ async def main():
         f"reasoning: {ACTIVE_LLM_CONFIG.reasoning_effort or 'default'}, "
         f"run label: {ACTIVE_LLM_CONFIG.run_label}"
     )
-    framework_prompts = select_framework_prompts(score_only=args.score_only)
+    framework_filter = [f.strip() for f in args.frameworks.split(",")] if args.frameworks else None
+    framework_prompts = select_framework_prompts(score_only=args.score_only, framework_filter=framework_filter)
 
     artifact_paths = resolve_artifact_paths(args.output_file)
     for path_str in [
@@ -2072,7 +2170,11 @@ async def main():
     with open(artifact_paths.outline_path, "w", encoding="utf-8") as handle:
         json.dump(to_json_safe(outline_payload), handle, indent=2, ensure_ascii=False)
 
-    check_issues = await post_synthesis_check(synthesis_payload, outline_context, snippets=all_snippets, character_names=character_names)
+    if is_short_text:
+        check_issues = []
+        print("  Skipping post-synthesis self-check for short text")
+    else:
+        check_issues = await post_synthesis_check(synthesis_payload, outline_context, snippets=all_snippets, character_names=character_names)
 
     write_jsonl(artifact_paths.snippets_path, all_snippets)
     write_jsonl(artifact_paths.characters_path, all_characters)
