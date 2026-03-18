@@ -171,7 +171,7 @@ FRAMEWORK_SYNTHESIS_PROMPTS = {
     },
     "Dan Harmon's Story Circle": {
         "filter_tag": "harmon",
-        "prompt_suffix": """Analyze the narrative through Dan Harmon's 8-step Story Circle. Focus on 'The Take' -- the price paid for the journey.\n\nThe analysis object must be:\n{\n  \"circle_stages\": {\n    \"you\": \"Character in comfort zone\",\n    \"need\": \"What they want/need\",\n    \"go\": \"Entering unfamiliar territory\",\n    \"search\": \"Adapting to the new situation\",\n    \"find\": \"Getting what they wanted\",\n    \"take\": \"The price paid\",\n    \"return\": \"Going back to familiar territory\",\n    \"change\": \"How they have changed\"\n  },\n  \"the_take\": \"The specific price paid -- what was lost or sacrificed\"\n}""",
+        "prompt_suffix": """Analyze the narrative through Dan Harmon's 8-step Story Circle. Focus on 'The Take' -- the price paid for the journey.\n\nThe analysis object must be:\n{\n  \"circle_stages\": {\n    \"you\": \"Character in comfort zone\",\n    \"need\": \"What they want/need\",\n    \"go\": \"Entering unfamiliar territory\",\n    \"search\": \"Adapting to the new situation\",\n    \"find\": \"Getting what they wanted\",\n    \"take\": \"The price paid -- what was lost or sacrificed\",\n    \"return\": \"Going back to familiar territory\",\n    \"change\": \"How they have changed\"\n  }\n}""",
     },
     "Save the Cat! Beat Sheet": {
         "filter_tag": "save_the_cat",
@@ -271,7 +271,6 @@ FRAMEWORK_ANALYSIS_SCHEMAS: dict[str, Any] = {
             "return": "str",
             "change": "str",
         },
-        "the_take": "str",
     },
     "Save the Cat! Beat Sheet": {"beats_present": ["str"], "pacing_deviations": "str"},
     "Propp's Morphology": {"applicable_narratemes": ["str"]},
@@ -342,9 +341,6 @@ Every named character: Name (aliases), Role, One-sentence description
 
 ## PLOT OUTLINE
 Chronological summary, 1 paragraph per major narrative movement.
-
-## THEMATIC TENSIONS
-2-4 central binary oppositions driving the narrative.
 
 Be concrete. Use actual names. Do not speculate about content between snippets."""
 
