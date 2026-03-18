@@ -1553,9 +1553,14 @@ Format your response EXACTLY like this:
     return events, substrate
 
 
+def _empty_substrate() -> dict[str, list[dict[str, Any]]]:
+    return {"characters": [], "dialogue_turns": [], "settings": []}
+
+
 async def process_short_text(
     text: str,
     outline_context: str,
+    skip_substrate: bool = False,
 ) -> dict[str, Any]:
     """Process short texts (<SHORT_TEXT_THRESHOLD chars) without FAISS retrieval.
 
@@ -1576,7 +1581,11 @@ async def process_short_text(
             "score": 1.0,
             "text": chunk_text,
         })
-    events, substrate = await extract_events_and_substrate_for_chunk(chunk_id, snippets, outline_context)
+    if skip_substrate:
+        events = await extract_events_for_chunk(chunk_id, snippets, outline_context)
+        substrate = _empty_substrate()
+    else:
+        events, substrate = await extract_events_and_substrate_for_chunk(chunk_id, snippets, outline_context)
     print(f"[short-text] Extracted {len(events)} events from {len(snippets)} snippets")
     return {
         "chunk_id": chunk_id,
@@ -1601,6 +1610,7 @@ async def process_chunk(
     keyword_vectors: list[tuple[str, list[float]]],
     outline_context: str,
     book_file: str,
+    skip_substrate: bool = False,
 ) -> dict[str, Any]:
     chunk_id = f"chunk-{chunk_idx}"
     async with CHUNK_SEMAPHORE:
@@ -1613,7 +1623,11 @@ async def process_chunk(
         )
 
         snippets = select_snippets_for_chunk(chunk_id, valid_micro_chunks, index, keyword_vectors)
-        events, substrate = await extract_events_and_substrate_for_chunk(chunk_id, snippets, outline_context)
+        if skip_substrate:
+            events = await extract_events_for_chunk(chunk_id, snippets, outline_context)
+            substrate = _empty_substrate()
+        else:
+            events, substrate = await extract_events_and_substrate_for_chunk(chunk_id, snippets, outline_context)
         print(f"[{chunk_id}] Extracted {len(events)} validated events")
         return {
             "chunk_id": chunk_id,
@@ -1687,7 +1701,22 @@ Rules:
             payload = extract_first_json_value(output)
             validated = validate_framework_result(framework_name, payload, allowed_event_ids)
         except Exception as exc:
-            repair_prompt = prompt + f"\n\nYour previous output failed validation: {exc}. Re-output corrected JSON only."
+            # Targeted repair: send only schema + broken output + error (not full prompt)
+            allowed_ids_sample = sorted(allowed_event_ids)[:10]
+            repair_prompt = f"""Fix this {framework_name} synthesis output. The validation error was:
+{exc}
+
+Your broken output was:
+{output[:3000]}
+
+Required JSON schema:
+{{
+  "analysis": {framework_config['prompt_suffix']},
+  "evidence_event_ids": {json.dumps(allowed_ids_sample)} (1-8 IDs from this set),
+  "confidence": <float 0.0-1.0>
+}}
+
+Output corrected JSON only. No markdown. No prose."""
             repair_output = await run_llm_cli(repair_prompt, retries=1)
             payload = extract_first_json_value(repair_output)
             validated = validate_framework_result(framework_name, payload, allowed_event_ids)
@@ -1725,26 +1754,65 @@ async def synthesize_frameworks(
     framework_prompts: dict[str, dict[str, Any]] | None = None,
     source_text_sample: str = "",
     character_names: list[str] | None = None,
+    synthesis_cache_path: str | None = None,
 ) -> dict[str, dict[str, Any]]:
     framework_prompts = framework_prompts or FRAMEWORK_SYNTHESIS_PROMPTS
-    print(f"\n--- Phase 3: Synthesizing {len(framework_prompts)} frameworks ---")
+
+    # Load partial results from a previous interrupted run
+    cached_results: dict[str, dict[str, Any]] = {}
+    if synthesis_cache_path and os.path.exists(synthesis_cache_path):
+        try:
+            with open(synthesis_cache_path, "r", encoding="utf-8") as f:
+                cached_results = json.load(f)
+            if not isinstance(cached_results, dict):
+                cached_results = {}
+        except (json.JSONDecodeError, OSError):
+            cached_results = {}
+
+    # Filter out already-completed frameworks
+    remaining = {k: v for k, v in framework_prompts.items() if k not in cached_results}
+    if cached_results and remaining:
+        print(f"\n--- Phase 3: Synthesizing {len(remaining)} frameworks ({len(cached_results)} cached) ---")
+    elif cached_results:
+        print(f"\n--- Phase 3: All {len(cached_results)} frameworks cached, skipping synthesis ---")
+        return cached_results
+    else:
+        print(f"\n--- Phase 3: Synthesizing {len(remaining)} frameworks ---")
+
+    # Accumulate results (start from cache)
+    results = dict(cached_results)
+
     async def _safe_synthesize(fw_name, config):
         try:
-            return await synthesize_single_framework(
+            name, payload = await synthesize_single_framework(
                 fw_name, config, events, outline_context,
                 source_text_sample=source_text_sample,
                 character_names=character_names,
             )
+            # Write partial result to disk immediately
+            if payload is not None and synthesis_cache_path:
+                results[name] = payload
+                try:
+                    with open(synthesis_cache_path, "w", encoding="utf-8") as f:
+                        json.dump(results, f, indent=2, ensure_ascii=False)
+                except OSError:
+                    pass
+            return name, payload
         except Exception as exc:
             print(f"  [ERROR] {fw_name} synthesis failed: {exc}")
             return fw_name, None
 
-    tasks = [_safe_synthesize(fw_name, config) for fw_name, config in framework_prompts.items()]
+    tasks = [_safe_synthesize(fw_name, config) for fw_name, config in remaining.items()]
     pairs = await asyncio.gather(*tasks)
     failed = [name for name, payload in pairs if payload is None]
     if failed:
         print(f"  WARNING: {len(failed)} framework(s) failed: {', '.join(failed)}")
-    return {name: payload for name, payload in pairs if payload is not None}
+
+    # Merge new results with cached
+    for name, payload in pairs:
+        if payload is not None:
+            results[name] = payload
+    return results
 
 
 POST_SYNTHESIS_CHECK_PROMPT = """You are a quality-control agent. Given a character outline, source text snippets, and a set of framework analyses, verify factual accuracy.
@@ -1985,6 +2053,7 @@ async def main():
     parser.add_argument("--reuse-from", default=None, help="Reuse existing outline/events artifacts and rerun synthesis only")
     parser.add_argument("--score-only", action="store_true", help="Only synthesize the Quadrant Scores block")
     parser.add_argument("--frameworks", type=str, default=None, help="Comma-separated list of framework names to synthesize (e.g., 'Quadrant Scores,Todorov')")
+    parser.add_argument("--skip-substrate", action="store_true", help="Skip substrate extraction (characters, dialogue, settings) — events only")
     args = parser.parse_args()
 
     global ACTIVE_LLM_CONFIG
@@ -2041,6 +2110,7 @@ async def main():
             framework_prompts=framework_prompts,
             source_text_sample=source_text_sample,
             character_names=character_names,
+            synthesis_cache_path=artifact_paths.synthesis_path,
         )
 
         for source_path, destination_path in [
@@ -2098,14 +2168,30 @@ async def main():
         print(f"Loaded {args.book_file}: {len(text):,} characters, {len(macro_chunks)} macro-chunks.")
 
     outline_samples = build_outline_samples(text)
-    global_outline = await generate_global_outline(outline_samples)
-    outline_context = build_outline_context(global_outline)
+
+    # Content-addressed outline cache: skip LLM call if source text unchanged
+    source_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+    outline_cache_hit = False
+    if os.path.exists(artifact_paths.outline_path):
+        try:
+            with open(artifact_paths.outline_path, "r", encoding="utf-8") as f:
+                cached_outline = json.load(f)
+            if cached_outline.get("source_hash") == source_hash:
+                global_outline = cached_outline["global_outline"]
+                outline_context = cached_outline["outline_context"]
+                outline_cache_hit = True
+                print(f"\n--- Phase 1: Outline cache hit (hash={source_hash}) ---")
+        except (json.JSONDecodeError, KeyError, OSError):
+            pass
+    if not outline_cache_hit:
+        global_outline = await generate_global_outline(outline_samples)
+        outline_context = build_outline_context(global_outline)
 
     if is_short_text:
         keywords = STATIC_KEYWORDS
         print(f"  Short text mode: skipping keyword extraction and FAISS retrieval")
         print(f"\n--- Phase 2: Short Text Direct Extraction ---")
-        short_report = await process_short_text(text, outline_context)
+        short_report = await process_short_text(text, outline_context, skip_substrate=args.skip_substrate)
         chunk_reports = [short_report]
     else:
         dynamic_keywords = await extract_dynamic_keywords(global_outline)
@@ -2130,6 +2216,7 @@ async def main():
                     keyword_vectors,
                     outline_context,
                     args.book_file,
+                    skip_substrate=args.skip_substrate,
                 )
                 for chunk_idx, macro_chunk in enumerate(macro_chunks)
             ]
@@ -2147,6 +2234,7 @@ async def main():
         framework_prompts=framework_prompts,
         source_text_sample=source_text_sample,
         character_names=character_names,
+        synthesis_cache_path=artifact_paths.synthesis_path,
     )
     all_snippets = [snippet for chunk in chunk_reports for snippet in chunk["snippets"]]
     all_characters = [record for chunk in chunk_reports for record in chunk["characters"]]
@@ -2157,6 +2245,7 @@ async def main():
         "ntsmr_version": NTSMR_VERSION,
         "ntsmr_run_label": ACTIVE_LLM_CONFIG.run_label,
         "book_file": args.book_file,
+        "source_hash": source_hash,
         "llm": {
             "backend": ACTIVE_LLM_CONFIG.backend,
             "model": ACTIVE_LLM_CONFIG.model,
