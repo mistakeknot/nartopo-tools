@@ -8,6 +8,7 @@ import re
 import shutil
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -77,7 +78,16 @@ CLAUDE_MODEL_ALIASES = {
     "sonnet": "claude-sonnet-4-6",
     "opus": "claude-opus-4-6",
 }
-SUPPORTED_LLM_BACKENDS = {"gemini", "codex-exec", "claude"}
+DEFAULT_OPENROUTER_MODEL = os.environ.get("NTSMR_OPENROUTER_MODEL", "qwen/qwen3.5-plus-02-15")
+OPENROUTER_API_BASE = os.environ.get("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
+OPENROUTER_TIMEOUT_SECONDS = int(os.environ.get("NTSMR_OPENROUTER_TIMEOUT_SECONDS", "180"))
+OPENROUTER_RETRIES = int(os.environ.get("NTSMR_OPENROUTER_RETRIES", "2"))
+OPENROUTER_MODEL_ALIASES = {
+    "qwen": "qwen/qwen3.5-plus-02-15",
+    "kimi": "moonshotai/kimi-k2.5",
+    "glm": "zhipu/glm-5",
+}
+SUPPORTED_LLM_BACKENDS = {"gemini", "codex-exec", "claude", "openrouter"}
 SUPPORTED_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 CLAUDE_REASONING_EFFORTS = {"low", "medium", "high"}
 
@@ -487,6 +497,12 @@ def build_llm_config(
             raise ValueError("Claude backend requires a reasoning effort")
         if normalized_reasoning not in CLAUDE_REASONING_EFFORTS:
             raise ValueError(f"Unsupported Claude reasoning effort: {normalized_reasoning} (must be low/medium/high)")
+    elif normalized_backend == "openrouter":
+        raw_model = (model or DEFAULT_OPENROUTER_MODEL).strip()
+        normalized_model = OPENROUTER_MODEL_ALIASES.get(raw_model, raw_model)
+        # OpenRouter reasoning effort is optional — passed as provider parameter if set
+        if normalized_reasoning and normalized_reasoning not in SUPPORTED_REASONING_EFFORTS:
+            raise ValueError(f"Unsupported reasoning effort: {normalized_reasoning}")
     else:
         normalized_model = (model or DEFAULT_CODEX_MODEL).strip()
         normalized_reasoning = normalized_reasoning or DEFAULT_CODEX_REASONING_EFFORT
@@ -1191,6 +1207,85 @@ async def run_claude_cli(
     raise RuntimeError(f"Claude CLI failed after retries: {last_error}")
 
 
+OPENROUTER_SYSTEM_PROMPT = (
+    "You are being used as a structured text generation backend inside the NTSMR "
+    "narrative analysis pipeline. Do not use tools, do not ask follow-up questions, "
+    "and do not add commentary outside the requested format. Return only the requested output."
+)
+
+
+async def run_openrouter_api(
+    prompt: str,
+    config: LlmConfig,
+    timeout: int = OPENROUTER_TIMEOUT_SECONDS,
+    retries: int = OPENROUTER_RETRIES,
+) -> str:
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENROUTER_API_KEY environment variable is required for the openrouter backend")
+
+    payload = {
+        "model": config.model,
+        "messages": [
+            {"role": "system", "content": OPENROUTER_SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.3,
+    }
+    if config.reasoning_effort:
+        payload["reasoning"] = {"effort": config.reasoning_effort}
+
+    body = json.dumps(payload).encode("utf-8")
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://nartopo.com",
+        "X-Title": "Nartopo NTSMR Pipeline",
+    }
+    url = f"{OPENROUTER_API_BASE}/chat/completions"
+
+    last_error: Exception | None = None
+    for attempt in range(1, retries + 2):
+        try:
+            req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+            loop = asyncio.get_event_loop()
+            response_bytes = await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: urllib.request.urlopen(req, timeout=timeout).read()),
+                timeout=timeout + 5,
+            )
+            envelope = json.loads(response_bytes.decode("utf-8"))
+
+            # Extract usage for token tracking
+            usage = envelope.get("usage", {})
+            TOKEN_USAGE.add(
+                input_tok=usage.get("prompt_tokens", 0),
+                output_tok=usage.get("completion_tokens", 0),
+                cost_usd=float(usage.get("total_cost", 0)) if "total_cost" in usage else 0.0,
+            )
+
+            choices = envelope.get("choices", [])
+            if not choices:
+                last_error = RuntimeError(f"OpenRouter returned no choices: {json.dumps(envelope)[:500]}")
+            else:
+                content = choices[0].get("message", {}).get("content", "")
+                if content:
+                    return content
+                last_error = RuntimeError("OpenRouter returned empty content")
+
+        except asyncio.TimeoutError:
+            last_error = TimeoutError(f"OpenRouter timed out after {timeout}s")
+        except urllib.error.HTTPError as exc:
+            error_body = exc.read().decode("utf-8", errors="replace")[:500]
+            last_error = RuntimeError(f"OpenRouter HTTP {exc.code}: {error_body}")
+        except Exception as exc:
+            last_error = RuntimeError(f"OpenRouter request failed: {exc}")
+
+        if attempt <= retries:
+            await asyncio.sleep(attempt * 2)  # Slightly longer backoff for API rate limits
+
+    raise RuntimeError(f"OpenRouter API failed after retries: {last_error}")
+
+
 async def run_llm_cli(prompt: str, timeout: int = GEMINI_TIMEOUT_SECONDS, retries: int = GEMINI_RETRIES) -> str:
     config = get_active_llm_config()
     if config.backend == "gemini":
@@ -1199,6 +1294,8 @@ async def run_llm_cli(prompt: str, timeout: int = GEMINI_TIMEOUT_SECONDS, retrie
         return await run_codex_exec_cli(prompt, config=config, timeout=timeout, retries=retries)
     if config.backend == "claude":
         return await run_claude_cli(prompt, config=config, timeout=timeout, retries=retries)
+    if config.backend == "openrouter":
+        return await run_openrouter_api(prompt, config=config, timeout=timeout, retries=retries)
     raise RuntimeError(f"Unhandled LLM backend: {config.backend}")
 
 
