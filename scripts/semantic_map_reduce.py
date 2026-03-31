@@ -1457,8 +1457,7 @@ async def build_faiss_index(book_file: str, chunk_id: str, micro_chunks: list[di
     chunks_path = f"{cache_base}.chunks.json"
     faiss.write_index(index, faiss_path)
     cache_data = {"source_file": os.path.basename(book_file), "chunks": list(valid_micro_chunks)}
-    with open(chunks_path, "w", encoding="utf-8") as handle:
-        json.dump(cache_data, handle, ensure_ascii=False)
+    atomic_write_json(chunks_path, cache_data, indent=0)
     return index, list(valid_micro_chunks), faiss_path, False
 
 
@@ -1890,8 +1889,7 @@ async def synthesize_frameworks(
             if payload is not None and synthesis_cache_path:
                 results[name] = payload
                 try:
-                    with open(synthesis_cache_path, "w", encoding="utf-8") as f:
-                        json.dump(results, f, indent=2, ensure_ascii=False)
+                    atomic_write_json(synthesis_cache_path, results)
                 except OSError:
                     pass
             return name, payload
@@ -2003,10 +2001,30 @@ async def post_synthesis_check(
         return []
 
 
+def atomic_write(path: str, content: str) -> None:
+    """Write content to a file atomically via temp file + os.replace."""
+    parent = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(dir=parent, suffix=".tmp", prefix=f".{os.path.basename(path)}.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
+    """Write JSON data to a file atomically."""
+    atomic_write(path, json.dumps(data, indent=indent, ensure_ascii=False))
+
+
 def write_jsonl(path: str, rows: list[dict[str, Any]]) -> None:
-    with open(path, "w", encoding="utf-8") as handle:
-        for row in rows:
-            handle.write(json.dumps(to_json_safe(row), ensure_ascii=False) + "\n")
+    lines = [json.dumps(to_json_safe(row), ensure_ascii=False) + "\n" for row in rows]
+    atomic_write(path, "".join(lines))
 
 
 def read_jsonl(path: str) -> list[dict[str, Any]]:
@@ -2226,8 +2244,7 @@ async def main():
             reuse_snippets = read_jsonl(source_artifacts.snippets_path)
         check_issues = await post_synthesis_check(synthesis_payload, outline_context, snippets=reuse_snippets, character_names=character_names)
 
-        with open(artifact_paths.synthesis_path, "w", encoding="utf-8") as handle:
-            json.dump(synthesis_payload, handle, indent=2, ensure_ascii=False)
+        atomic_write_json(artifact_paths.synthesis_path, synthesis_payload)
 
         report_payload = build_reused_report(
             source_report=source_report,
@@ -2238,8 +2255,7 @@ async def main():
         if check_issues:
             report_payload["post_synthesis_issues"] = check_issues
         report_payload["score_only"] = args.score_only
-        with open(artifact_paths.report_path, "w", encoding="utf-8") as handle:
-            json.dump(report_payload, handle, indent=2, ensure_ascii=False)
+        atomic_write_json(artifact_paths.report_path, report_payload)
         usage = TOKEN_USAGE.snapshot()
         print(f"Reused artifacts from {args.reuse_from}; synthesized {len(synthesis_payload)} frameworks.")
         if usage["llm_calls"] > 0:
@@ -2353,8 +2369,7 @@ async def main():
         "outline_context": outline_context,
         "keywords": keywords,
     }
-    with open(artifact_paths.outline_path, "w", encoding="utf-8") as handle:
-        json.dump(to_json_safe(outline_payload), handle, indent=2, ensure_ascii=False)
+    atomic_write_json(artifact_paths.outline_path, to_json_safe(outline_payload))
 
     if is_short_text:
         check_issues = []
@@ -2368,8 +2383,7 @@ async def main():
     write_jsonl(artifact_paths.settings_path, all_settings)
     write_jsonl(artifact_paths.events_path, all_events)
 
-    with open(artifact_paths.synthesis_path, "w", encoding="utf-8") as handle:
-        json.dump(synthesis_payload, handle, indent=2, ensure_ascii=False)
+    atomic_write_json(artifact_paths.synthesis_path, synthesis_payload)
 
     report_payload = build_report(
         args.book_file,
@@ -2385,8 +2399,7 @@ async def main():
     if check_issues:
         report_payload["post_synthesis_issues"] = check_issues
     report_payload["score_only"] = args.score_only
-    with open(artifact_paths.report_path, "w", encoding="utf-8") as handle:
-        json.dump(report_payload, handle, indent=2, ensure_ascii=False)
+    atomic_write_json(artifact_paths.report_path, report_payload)
 
     usage = TOKEN_USAGE.snapshot()
     print(f"\nDone! Pipeline completed in {time.time() - start_time:.2f} seconds.")
