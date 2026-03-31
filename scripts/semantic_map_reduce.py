@@ -87,6 +87,7 @@ OPENROUTER_MODEL_ALIASES = {
     "qwen-big": "qwen/qwen3.5-397b-a17b",
     "kimi": "moonshotai/kimi-k2.5",
     "glm": "z-ai/glm-4.7",
+    "glm5": "z-ai/glm-5",
     "deepseek": "deepseek/deepseek-v3.2",
     "deepseek-speciale": "deepseek/deepseek-v3.2-speciale",
     "minimax": "minimax/minimax-m2.5",
@@ -442,6 +443,69 @@ class LlmConfig:
     model: str
     reasoning_effort: str | None
     run_label: str
+
+
+@dataclass(frozen=True)
+class PhaseRouting:
+    """Per-phase model routing: different models for extraction vs synthesis."""
+    extraction: LlmConfig
+    synthesis: LlmConfig
+
+    def config_for(self, phase: str) -> LlmConfig:
+        return self.synthesis if phase == "synthesis" else self.extraction
+
+
+def _openrouter_config(alias: str, run_label_part: str) -> LlmConfig:
+    model = OPENROUTER_MODEL_ALIASES.get(alias, alias)
+    return LlmConfig(backend="openrouter", model=model, reasoning_effort=None,
+                     run_label=f"NTSMR-{NTSMR_VERSION}-{model}")
+
+
+ROUTING_PRESETS: dict[str, tuple[str, str]] = {
+    # (extraction_alias, synthesis_alias)
+    "economy":  ("minimax",  "minimax"),
+    "balanced": ("deepseek", "glm5"),
+    "quality":  ("glm5",     "glm5"),
+}
+
+
+def build_phase_routing(
+    preset: str | None,
+    extraction_model: str | None,
+    synthesis_model: str | None,
+    extraction_backend: str | None,
+    synthesis_backend: str | None,
+) -> PhaseRouting | None:
+    """Build per-phase routing from preset + overrides. Returns None if no routing requested."""
+    if not preset and not extraction_model and not synthesis_model:
+        return None
+
+    if preset and preset not in ROUTING_PRESETS:
+        raise ValueError(f"Unknown routing preset: {preset} (choices: {', '.join(ROUTING_PRESETS)})")
+
+    ext_alias, syn_alias = ROUTING_PRESETS.get(preset or "balanced", ("deepseek", "glm5"))
+
+    # Apply per-phase overrides
+    if extraction_model:
+        ext_alias = extraction_model
+    if synthesis_model:
+        syn_alias = synthesis_model
+
+    ext_backend = extraction_backend or "openrouter"
+    syn_backend = synthesis_backend or "openrouter"
+
+    ext_model = OPENROUTER_MODEL_ALIASES.get(ext_alias, ext_alias) if ext_backend == "openrouter" else ext_alias
+    syn_model = OPENROUTER_MODEL_ALIASES.get(syn_alias, syn_alias) if syn_backend == "openrouter" else syn_alias
+
+    ext_config = LlmConfig(backend=ext_backend, model=ext_model, reasoning_effort=None,
+                           run_label=f"NTSMR-{NTSMR_VERSION}-{ext_model}")
+    syn_config = LlmConfig(backend=syn_backend, model=syn_model, reasoning_effort=None,
+                           run_label=f"NTSMR-{NTSMR_VERSION}-{syn_model}")
+
+    return PhaseRouting(extraction=ext_config, synthesis=syn_config)
+
+
+ACTIVE_ROUTING: PhaseRouting | None = None
 
 
 def ordered_dedupe(items: list[str]) -> list[str]:
@@ -1290,8 +1354,9 @@ async def run_openrouter_api(
     raise RuntimeError(f"OpenRouter API failed after retries: {last_error}")
 
 
-async def run_llm_cli(prompt: str, timeout: int = GEMINI_TIMEOUT_SECONDS, retries: int = GEMINI_RETRIES) -> str:
-    config = get_active_llm_config()
+async def run_llm_cli(prompt: str, phase: str = "extraction", timeout: int = GEMINI_TIMEOUT_SECONDS, retries: int = GEMINI_RETRIES) -> str:
+    global ACTIVE_ROUTING
+    config = ACTIVE_ROUTING.config_for(phase) if ACTIVE_ROUTING else get_active_llm_config()
     if config.backend == "gemini":
         return await run_gemini_cli(prompt, timeout=timeout, retries=retries)
     if config.backend == "codex-exec":
@@ -1792,7 +1857,7 @@ Rules:
 {framework_config['prompt_suffix']}
 - Output JSON only. No markdown. No prose.
 """
-        output = await run_llm_cli(prompt)
+        output = await run_llm_cli(prompt, phase="synthesis")
         try:
             payload = extract_first_json_value(output)
             validated = validate_framework_result(framework_name, payload, allowed_event_ids)
@@ -1813,7 +1878,7 @@ Required JSON schema:
 }}
 
 Output corrected JSON only. No markdown. No prose."""
-            repair_output = await run_llm_cli(repair_prompt, retries=1)
+            repair_output = await run_llm_cli(repair_prompt, phase="synthesis", retries=1)
             payload = extract_first_json_value(repair_output)
             validated = validate_framework_result(framework_name, payload, allowed_event_ids)
 
@@ -2164,6 +2229,10 @@ async def main():
     parser.add_argument("--llm-backend", choices=sorted(SUPPORTED_LLM_BACKENDS), default=None)
     parser.add_argument("--llm-model", default=None)
     parser.add_argument("--llm-reasoning-effort", choices=sorted(SUPPORTED_REASONING_EFFORTS | CLAUDE_REASONING_EFFORTS), default=None)
+    parser.add_argument("--routing", choices=sorted(ROUTING_PRESETS.keys()), default=None,
+                        help="Per-phase model routing preset (economy/balanced/quality)")
+    parser.add_argument("--synthesis-model", default=None, help="Override synthesis model (alias or full ID)")
+    parser.add_argument("--extraction-model", default=None, help="Override extraction model (alias or full ID)")
     parser.add_argument("--run-label", default=None)
     parser.add_argument("--reuse-from", default=None, help="Reuse existing outline/events artifacts and rerun synthesis only")
     parser.add_argument("--score-only", action="store_true", help="Only synthesize the Quadrant Scores block")
@@ -2171,7 +2240,7 @@ async def main():
     parser.add_argument("--skip-substrate", action="store_true", help="Skip substrate extraction (characters, dialogue, settings) — events only")
     args = parser.parse_args()
 
-    global ACTIVE_LLM_CONFIG
+    global ACTIVE_LLM_CONFIG, ACTIVE_ROUTING
     ACTIVE_LLM_CONFIG = build_llm_config(
         backend=args.llm_backend,
         model=args.llm_model,
@@ -2179,13 +2248,40 @@ async def main():
         run_label=args.run_label,
     )
 
+    # Per-phase routing (overrides ACTIVE_LLM_CONFIG when set)
+    ACTIVE_ROUTING = build_phase_routing(
+        preset=args.routing,
+        extraction_model=args.extraction_model,
+        synthesis_model=args.synthesis_model,
+        extraction_backend=args.llm_backend if not args.routing else None,
+        synthesis_backend=args.llm_backend if not args.routing else None,
+    )
+    if ACTIVE_ROUTING:
+        # Override run label to reflect hybrid routing
+        syn_short = ACTIVE_ROUTING.synthesis.model.split("/")[-1]
+        ext_short = ACTIVE_ROUTING.extraction.model.split("/")[-1]
+        preset_name = args.routing or "custom"
+        hybrid_label = args.run_label or f"NTSMR-{NTSMR_VERSION}-{preset_name}-{syn_short}+{ext_short}"
+        ACTIVE_LLM_CONFIG = LlmConfig(
+            backend="openrouter", model=f"{preset_name}-routing",
+            reasoning_effort=None, run_label=hybrid_label,
+        )
+
     TOKEN_USAGE.reset()
     start_time = time.time()
-    print(
-        f"LLM backend: {ACTIVE_LLM_CONFIG.backend}, model: {ACTIVE_LLM_CONFIG.model}, "
-        f"reasoning: {ACTIVE_LLM_CONFIG.reasoning_effort or 'default'}, "
-        f"run label: {ACTIVE_LLM_CONFIG.run_label}"
-    )
+    if ACTIVE_ROUTING:
+        print(
+            f"Routing: {args.routing or 'custom'} "
+            f"(extraction: {ACTIVE_ROUTING.extraction.model}, "
+            f"synthesis: {ACTIVE_ROUTING.synthesis.model}), "
+            f"run label: {ACTIVE_LLM_CONFIG.run_label}"
+        )
+    else:
+        print(
+            f"LLM backend: {ACTIVE_LLM_CONFIG.backend}, model: {ACTIVE_LLM_CONFIG.model}, "
+            f"reasoning: {ACTIVE_LLM_CONFIG.reasoning_effort or 'default'}, "
+            f"run label: {ACTIVE_LLM_CONFIG.run_label}"
+        )
     framework_filter = [f.strip() for f in args.frameworks.split(",")] if args.frameworks else None
     framework_prompts = select_framework_prompts(score_only=args.score_only, framework_filter=framework_filter)
 
