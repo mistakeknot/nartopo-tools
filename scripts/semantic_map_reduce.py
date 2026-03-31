@@ -84,8 +84,12 @@ OPENROUTER_TIMEOUT_SECONDS = int(os.environ.get("NTSMR_OPENROUTER_TIMEOUT_SECOND
 OPENROUTER_RETRIES = int(os.environ.get("NTSMR_OPENROUTER_RETRIES", "2"))
 OPENROUTER_MODEL_ALIASES = {
     "qwen": "qwen/qwen3.5-plus-02-15",
+    "qwen-big": "qwen/qwen3.5-397b-a17b",
     "kimi": "moonshotai/kimi-k2.5",
-    "glm": "zhipu/glm-5",
+    "glm": "z-ai/glm-4.7",
+    "deepseek": "deepseek/deepseek-v3.2",
+    "deepseek-speciale": "deepseek/deepseek-v3.2-speciale",
+    "minimax": "minimax/minimax-m2.5",
 }
 SUPPORTED_LLM_BACKENDS = {"gemini", "codex-exec", "claude", "openrouter"}
 SUPPORTED_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
