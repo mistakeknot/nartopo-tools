@@ -80,7 +80,7 @@ CLAUDE_MODEL_ALIASES = {
 }
 DEFAULT_OPENROUTER_MODEL = os.environ.get("NTSMR_OPENROUTER_MODEL", "qwen/qwen3.5-plus-02-15")
 OPENROUTER_API_BASE = os.environ.get("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
-OPENROUTER_TIMEOUT_SECONDS = int(os.environ.get("NTSMR_OPENROUTER_TIMEOUT_SECONDS", "180"))
+OPENROUTER_TIMEOUT_SECONDS = int(os.environ.get("NTSMR_OPENROUTER_TIMEOUT_SECONDS", "300"))
 OPENROUTER_RETRIES = int(os.environ.get("NTSMR_OPENROUTER_RETRIES", "2"))
 OPENROUTER_MODEL_ALIASES = {
     "qwen": "qwen/qwen3.5-plus-02-15",
@@ -105,6 +105,7 @@ SHORT_TEXT_THRESHOLD = 30_000
 RETRIEVAL_TOP_K = 2
 MIN_EVENTS_PER_CHUNK = 1
 MIN_TAGGED_EVENTS = 2
+MAX_EVENTS_PER_SYNTHESIS = int(os.environ.get("NTSMR_MAX_EVENTS_PER_SYNTHESIS", "60"))
 MAX_OUTLINE_CONTEXT_CHARS = 5_000
 
 EMBED_CONCURRENCY = int(os.environ.get("NTSMR_EMBED_CONCURRENCY", "8"))
@@ -1050,21 +1051,32 @@ def filter_events_for_framework(
     events: list[dict[str, Any]],
     filter_tag: str | None,
     min_events: int = MIN_TAGGED_EVENTS,
+    max_events: int = MAX_EVENTS_PER_SYNTHESIS,
 ) -> tuple[list[dict[str, Any]], bool]:
+    # No filter tag: use stratified sampling to cap at max_events
     if not filter_tag:
-        return events, False
+        if len(events) <= max_events:
+            return events, False
+        # Stratified: pick evenly spaced events to preserve narrative arc
+        step = len(events) / max_events
+        sampled = [events[int(i * step)] for i in range(max_events)]
+        return sampled, False
+
     tagged = [
         event
         for event in events
         if any(signal.startswith(f"{filter_tag}:") for signal in event.get("framework_signals", []))
     ]
     if len(tagged) >= min_events:
-        return tagged, False
+        return tagged[:max_events], False
 
-    # Improved fallback: score events by keyword relevance instead of using all events
+    # Fallback: score events by keyword relevance
     keywords = FRAMEWORK_FALLBACK_KEYWORDS.get(filter_tag, [])
     if not keywords:
-        return events, True
+        if len(events) <= max_events:
+            return events, True
+        step = len(events) / max_events
+        return [events[int(i * step)] for i in range(max_events)], True
 
     def relevance_score(event: dict[str, Any]) -> float:
         summary = event.get("summary", "").lower()
@@ -1072,11 +1084,10 @@ def filter_events_for_framework(
 
     scored = [(relevance_score(e), i, e) for i, e in enumerate(events)]
     scored.sort(key=lambda x: (-x[0], x[1]))
-    # Take tagged events + top relevant events up to MAX_FALLBACK_EVENTS
     selected_ids = {id(e) for e in tagged}
     result = list(tagged)
     for score, _, event in scored:
-        if id(event) not in selected_ids and len(result) < MAX_FALLBACK_EVENTS:
+        if id(event) not in selected_ids and len(result) < max_events:
             result.append(event)
             selected_ids.add(id(event))
     return result, True
