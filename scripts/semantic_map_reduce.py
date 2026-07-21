@@ -19,7 +19,38 @@ import threading
 import faiss
 import numpy as np
 
-NTSMR_VERSION = "2.5"
+NTSMR_VERSION = "2.6"
+
+# ── Site-label-space emission (v2.6, Nartopo-brj) ───────────────────────────
+# The Quadrant Scores prompt scores five axes in "literal" polarity (0=slow,
+# 1=fast; 0=defeated, 1=triumphant; ...) — a convention its calibration
+# anchors and bias warnings are tuned around, and the OPPOSITE of the site
+# label anchors in Nartopo src/lib/types.ts AXIS_OPTIONS (Linear->Fractured,
+# Action-Driven->Observational, Victory->Assimilation, Western Combat->
+# Kishotenketsu, Physical->Ideological). v2.4/v2.5 emitted prompt-space raw,
+# which shipped inverted scores to every consumer until Nartopo added an
+# ingestion transform (toSiteLabelSpace, gated on LITERAL_SEMANTICS_VERSIONS
+# = {2.4, 2.5} — that set MUST NOT GROW). From v2.6 the pipeline emits
+# site-label space natively: the tuned prompt is untouched, and this single
+# emission-time inversion converts the model output before anything is
+# cached or written. threat_scale was polarity-aligned all along.
+SITE_SPACE_INVERTED_AXES = (
+    "time_linearity",
+    "pacing_velocity",
+    "protagonist_fate",
+    "conflict_style",
+    "price_type",
+)
+
+
+def quadrant_to_site_label_space(analysis):
+    """Invert prompt-space quadrant axes into site-label space (1 - x)."""
+    out = dict(analysis)
+    for axis in SITE_SPACE_INVERTED_AXES:
+        value = out.get(axis)
+        if isinstance(value, (int, float)):
+            out[axis] = round(1 - value, 2)
+    return out
 
 
 class TokenAccumulator:
@@ -1895,6 +1926,16 @@ Output corrected JSON only. No markdown. No prose."""
 
         validated["used_full_timeline_fallback"] = used_fallback
         validated["event_count"] = len(selected_events)
+
+        # v2.6: emit Quadrant Scores in site-label space (see NTSMR_VERSION
+        # block). This is the single choke point before caching/artifacts.
+        if framework_name == "Quadrant Scores" and isinstance(
+            validated.get("analysis"), dict
+        ):
+            validated["analysis"] = quadrant_to_site_label_space(
+                validated["analysis"]
+            )
+            validated["score_space"] = "site-label/v1"
 
         # Post-synthesis name check: log unknown names (exact match only)
         if character_names:
