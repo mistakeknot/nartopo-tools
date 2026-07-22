@@ -113,6 +113,20 @@ DEFAULT_OPENROUTER_MODEL = os.environ.get("NTSMR_OPENROUTER_MODEL", "qwen/qwen3.
 OPENROUTER_API_BASE = os.environ.get("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
 OPENROUTER_TIMEOUT_SECONDS = int(os.environ.get("NTSMR_OPENROUTER_TIMEOUT_SECONDS", "300"))
 OPENROUTER_RETRIES = int(os.environ.get("NTSMR_OPENROUTER_RETRIES", "2"))
+# Kimi Coding Plan (flat-rate subscription) — OpenAI-compatible /chat/completions
+# at a coding-plan-specific base (NOT the public Moonshot API). Verified 2026-07-22.
+KIMI_API_BASE = os.environ.get("KIMI_BASE_URL", "https://api.kimi.com/coding/v1")
+DEFAULT_KIMI_MODEL = os.environ.get("NTSMR_KIMI_MODEL", "k3")
+KIMI_MODEL_ALIASES = {
+    "kimi": "k3",
+    "k3": "k3",
+    "kimi-k3": "k3",
+    "kimi-k2.5": "kimi-k2.5",
+    "kimi-for-coding": "kimi-for-coding",  # K2.7 Coding
+}
+# Kimi coding models that accept a think-effort param (low/high/max); K2.x do not.
+KIMI_EFFORT_MODELS = {"k3"}
+KIMI_REASONING_EFFORTS = {"low", "high", "max"}
 OPENROUTER_MODEL_ALIASES = {
     "qwen": "qwen/qwen3.5-plus-02-15",
     "qwen-big": "qwen/qwen3.5-397b-a17b",
@@ -123,7 +137,7 @@ OPENROUTER_MODEL_ALIASES = {
     "deepseek-speciale": "deepseek/deepseek-v3.2-speciale",
     "minimax": "minimax/minimax-m2.5",
 }
-SUPPORTED_LLM_BACKENDS = {"gemini", "codex-exec", "claude", "openrouter"}
+SUPPORTED_LLM_BACKENDS = {"gemini", "codex-exec", "claude", "openrouter", "kimi-coding"}
 SUPPORTED_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 CLAUDE_REASONING_EFFORTS = {"low", "medium", "high"}
 
@@ -597,6 +611,16 @@ def build_llm_config(
             raise ValueError("Claude backend requires a reasoning effort")
         if normalized_reasoning not in CLAUDE_REASONING_EFFORTS:
             raise ValueError(f"Unsupported Claude reasoning effort: {normalized_reasoning} (must be low/medium/high)")
+    elif normalized_backend == "kimi-coding":
+        raw_model = (model or DEFAULT_KIMI_MODEL).strip()
+        normalized_model = KIMI_MODEL_ALIASES.get(raw_model, raw_model)
+        # K3 is a reasoning model and accepts a think-effort (low/high/max);
+        # K2.x coding models do not take a reasoning-effort param at all.
+        if normalized_reasoning:
+            if normalized_model not in KIMI_EFFORT_MODELS:
+                raise ValueError(f"kimi-coding model {normalized_model} does not support reasoning effort overrides")
+            if normalized_reasoning not in KIMI_REASONING_EFFORTS:
+                raise ValueError(f"Unsupported Kimi reasoning effort: {normalized_reasoning} (must be low/high/max)")
     elif normalized_backend == "openrouter":
         raw_model = (model or DEFAULT_OPENROUTER_MODEL).strip()
         normalized_model = OPENROUTER_MODEL_ALIASES.get(raw_model, raw_model)
@@ -1330,17 +1354,31 @@ async def run_openrouter_api(
     timeout: int = OPENROUTER_TIMEOUT_SECONDS,
     retries: int = OPENROUTER_RETRIES,
 ) -> str:
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY environment variable is required for the openrouter backend")
+    # Backend profile: openrouter vs kimi-coding share the OpenAI-compatible path,
+    # differing only in base URL + credential env var.
+    if config.backend == "kimi-coding":
+        api_key = os.environ.get("KIMI_API_KEY")
+        if not api_key:
+            raise RuntimeError("KIMI_API_KEY environment variable is required for the kimi-coding backend")
+        api_base = KIMI_API_BASE
+        provider_name = "Kimi"
+    else:
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENROUTER_API_KEY environment variable is required for the openrouter backend")
+        api_base = OPENROUTER_API_BASE
+        provider_name = "OpenRouter"
 
+    # Kimi coding-plan models reject any temperature other than 1; OpenRouter models
+    # use the tuned 0.3. Keep the value backend-appropriate.
+    temperature = 1 if config.backend == "kimi-coding" else 0.3
     payload = {
         "model": config.model,
         "messages": [
             {"role": "system", "content": OPENROUTER_SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
-        "temperature": 0.3,
+        "temperature": temperature,
     }
     if config.reasoning_effort:
         payload["reasoning"] = {"effort": config.reasoning_effort}
@@ -1352,7 +1390,7 @@ async def run_openrouter_api(
         "HTTP-Referer": "https://nartopo.com",
         "X-Title": "Nartopo NTSMR Pipeline",
     }
-    url = f"{OPENROUTER_API_BASE}/chat/completions"
+    url = f"{api_base}/chat/completions"
 
     last_error: Exception | None = None
     for attempt in range(1, retries + 2):
@@ -1375,25 +1413,25 @@ async def run_openrouter_api(
 
             choices = envelope.get("choices", [])
             if not choices:
-                last_error = RuntimeError(f"OpenRouter returned no choices: {json.dumps(envelope)[:500]}")
+                last_error = RuntimeError(f"{provider_name} returned no choices: {json.dumps(envelope)[:500]}")
             else:
                 content = choices[0].get("message", {}).get("content", "")
                 if content:
                     return content
-                last_error = RuntimeError("OpenRouter returned empty content")
+                last_error = RuntimeError(f"{provider_name} returned empty content")
 
         except asyncio.TimeoutError:
-            last_error = TimeoutError(f"OpenRouter timed out after {timeout}s")
+            last_error = TimeoutError(f"{provider_name} timed out after {timeout}s")
         except urllib.error.HTTPError as exc:
             error_body = exc.read().decode("utf-8", errors="replace")[:500]
-            last_error = RuntimeError(f"OpenRouter HTTP {exc.code}: {error_body}")
+            last_error = RuntimeError(f"{provider_name} HTTP {exc.code}: {error_body}")
         except Exception as exc:
-            last_error = RuntimeError(f"OpenRouter request failed: {exc}")
+            last_error = RuntimeError(f"{provider_name} request failed: {exc}")
 
         if attempt <= retries:
             await asyncio.sleep(attempt * 2)  # Slightly longer backoff for API rate limits
 
-    raise RuntimeError(f"OpenRouter API failed after retries: {last_error}")
+    raise RuntimeError(f"{provider_name} API failed after retries: {last_error}")
 
 
 async def run_llm_cli(prompt: str, phase: str = "extraction", timeout: int = GEMINI_TIMEOUT_SECONDS, retries: int = GEMINI_RETRIES) -> str:
@@ -1405,7 +1443,7 @@ async def run_llm_cli(prompt: str, phase: str = "extraction", timeout: int = GEM
         return await run_codex_exec_cli(prompt, config=config, timeout=timeout, retries=retries)
     if config.backend == "claude":
         return await run_claude_cli(prompt, config=config, timeout=timeout, retries=retries)
-    if config.backend == "openrouter":
+    if config.backend in ("openrouter", "kimi-coding"):
         return await run_openrouter_api(prompt, config=config, timeout=timeout, retries=retries)
     raise RuntimeError(f"Unhandled LLM backend: {config.backend}")
 
