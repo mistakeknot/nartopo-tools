@@ -3,8 +3,8 @@
  * Deterministic body re-render from committed synthesis artifacts
  * (Nartopo-f38 backfill, zero LLM calls).
  *
- * Reads a TSV of `slug<TAB>artifact-run-label` (produced by the classifier
- * audit in the Nartopo repo), loads each work's
+ * Reads a TSV of `slug<TAB>artifact-run-label[<TAB>lenient]` (produced by
+ * the classifier audit in the Nartopo repo), loads each work's
  * artifacts/<slug>.md.<label>.synthesis.json, renders the markdown body
  * with the exact section template add-analysis.ts uses, and splices it
  * under the work's existing YAML frontmatter — which is preserved
@@ -70,7 +70,7 @@ function danHarmonTake(syn: Synthesis): string {
 }
 
 /** Mirrors the body template in nartopo-tools/scripts/add-analysis.ts. */
-function renderBody(syn: Synthesis): string {
+function renderBody(syn: Synthesis, lenient = false): string {
   const ki = optionalField(syn, "Kishotenketsu", "ki");
   const sho = optionalField(syn, "Kishotenketsu", "sho");
   const ten = optionalField(syn, "Kishotenketsu", "ten");
@@ -85,6 +85,24 @@ function renderBody(syn: Synthesis): string {
     .join("\n");
 
   const plotPoints = `PP1: ${field(syn, "The Three-Act Structure", "plot_point_1")} PP2: ${field(syn, "The Three-Act Structure", "plot_point_2")}`;
+
+  // Lenient mode (opt-in per work via TSV flag): a synthesis missing the
+  // Lévi-Strauss block renders an honest pending note for that one section
+  // instead of skipping the whole work. Every other block stays strict.
+  const leviStrauss = (() => {
+    try {
+      return [
+        `- **Primary Binary:** ${field(syn, "Levi-Strauss's Binary Oppositions", "primary_binary")}`,
+        `- **Secondary Binary:** ${field(syn, "Levi-Strauss's Binary Oppositions", "secondary_binary")}`,
+        `- **The Mediator:** ${field(syn, "Levi-Strauss's Binary Oppositions", "mediator")}`,
+      ].join("\n");
+    } catch (e) {
+      if (lenient && e instanceof FieldError) {
+        return "- *Analysis pending for this framework.*";
+      }
+      throw e;
+    }
+  })();
 
   const markdown = `
 # Structural Analysis
@@ -133,9 +151,7 @@ ${kishotenketsuDetails ? kishotenketsuDetails + "\n" : ""}
 - **Plot Points:** ${plotPoints}
 
 ## 12. Lévi-Strauss's Binary Oppositions
-- **Primary Binary:** ${field(syn, "Levi-Strauss's Binary Oppositions", "primary_binary")}
-- **Secondary Binary:** ${field(syn, "Levi-Strauss's Binary Oppositions", "secondary_binary")}
-- **The Mediator:** ${field(syn, "Levi-Strauss's Binary Oppositions", "mediator")}
+${leviStrauss}
 
 ## 13. Cognitive Estrangement (Suvin / Shklovsky)
 - **The Familiar Concept:** ${field(syn, "Cognitive Estrangement", "familiar_concept")}
@@ -183,16 +199,16 @@ const rows = fs
   .readFileSync(tsvPath, "utf8")
   .trim()
   .split("\n")
-  .map((l) => l.split("\t") as [string, string]);
+  .map((l) => l.split("\t") as [string, string, string?]);
 
 let rendered = 0;
 const skipped: string[] = [];
-for (const [slug, label] of rows) {
+for (const [slug, label, flag] of rows) {
   const artifactPath = path.join(ARTIFACTS, `${slug}.md.${label}.synthesis.json`);
   const dataPath = path.join(DATA_DIR, `${slug}.md`);
   try {
     const syn = JSON.parse(fs.readFileSync(artifactPath, "utf8")) as Synthesis;
-    const body = renderBody(syn);
+    const body = renderBody(syn, flag === "lenient");
     const raw = fs.readFileSync(dataPath, "utf8");
     const [frontmatter] = splitFrontmatter(raw);
     fs.writeFileSync(dataPath, frontmatter + "\n" + body);
