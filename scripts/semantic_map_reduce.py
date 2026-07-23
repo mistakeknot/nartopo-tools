@@ -1449,11 +1449,18 @@ async def run_llm_cli(prompt: str, phase: str = "extraction", timeout: int = GEM
 
 
 def embedding_hosts() -> list[str]:
+    # Substrate-phase embeddings (nomic-embed-text, 768-dim) are served by a
+    # local ollama instance. Resolution order:
+    #   1. OLLAMA_HOST env var  — explicit override (e.g. a remote Tailscale host)
+    #   2. localhost:11434      — the default: ollama runs on the same box as the
+    #                             pipeline (installed user-space on zklw, Nartopo-ack)
+    # The former hardcoded fallback 100.107.177.128 (mistakenot, a Windows box)
+    # was removed 2026-07-23: it was offline for weeks and only added a per-miss
+    # timeout. Point OLLAMA_HOST at a remote host if you need one.
     primary = os.environ.get("OLLAMA_HOST")
     hosts = []
     if primary:
         hosts.append(primary)
-    hosts.append("http://100.107.177.128:11434")
     hosts.append("http://localhost:11434")
     return ordered_dedupe(hosts)
 
